@@ -1155,16 +1155,20 @@ async def copy_ref(callback: types.CallbackQuery):
 
 # ===================== ЕЖЕДНЕВНЫЙ БОНУС =====================
 @dp.message(F.text == "🎁 Бонус")
+@dp.message(F.text == "🎁 Бонус")
 async def daily_bonus(message: types.Message):
     user_id = message.from_user.id
     user = await get_user(user_id)
     today = datetime.now().date()
 
-    if user['last_daily']:
-        last = datetime.fromisoformat(user['last_daily']).date()
-        if last == today:
-            await message.answer("⏳ Ты уже получал бонус сегодня!")
-            return
+    if user['last_daily'] and user['last_daily'] is not None:
+        try:
+            last = datetime.fromisoformat(user['last_daily']).date()
+            if last == today:
+                await message.answer("⏳ Ты уже получал бонус сегодня!")
+                return
+        except (ValueError, TypeError):
+            pass
 
     bonus = 50
     user['balance'] += bonus
