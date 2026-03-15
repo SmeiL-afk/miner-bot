@@ -250,9 +250,7 @@ async def init_db():
                                   DEFAULT
                                   1.0,
                                   inventory
-                                  TEXT
-                                  DEFAULT
-                                  '{}',
+                                  TEXT,
                                   total_mined
                                   INT
                                   DEFAULT
@@ -269,7 +267,7 @@ async def init_db():
                                   referrer BIGINT,
                                   referral_count INT DEFAULT 0,
                                   referral_earnings INT DEFAULT 0,
-                                  used_promos TEXT DEFAULT '[]',
+                                  used_promos TEXT,
                                   last_daily DATETIME,
                                   daily_streak INT DEFAULT 0,
                                   username VARCHAR
@@ -281,7 +279,7 @@ async def init_db():
                                   255
                               ),
                                   current_location INT DEFAULT 1,
-                                  unlocked_locations TEXT DEFAULT '[1]',
+                                  unlocked_locations TEXT,
                                   rarest_find VARCHAR
                               (
                                   50
@@ -304,7 +302,7 @@ async def init_db():
                               ),
                                   value TEXT,
                                   uses INT,
-                                  used_by TEXT DEFAULT '[]'
+                                  used_by TEXT
                                   )
                               ''')
             await conn.commit()
