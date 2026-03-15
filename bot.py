@@ -37,7 +37,7 @@ MYSQL_CONFIG = {
     "port": int(os.environ.get("MYSQLPORT", 3306)),
     "user": os.environ.get("MYSQLUSER"),
     "password": os.environ.get("MYSQL_ROOT_PASSWORD"),
-    "db": os.environ.get("MYSQLDATABASE")
+    "db": os.environ.get("MYSQLDATABASE") or "railway"
 }
 
 pool = None
