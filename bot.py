@@ -167,15 +167,16 @@ PROMO_CODES = {
     "BOOST24": {"type": "boost", "value": 24, "uses": 100, "used_by": []},
     "DRILL2": {"type": "drill", "value": 2, "uses": 10, "used_by": []},
     "STARTVIP": {
-        "type": "combo",
-        "value": {
-            "vip": 7,
-            "drill": 5,
-            "balance": 500
-        },
-        "uses": 1000,
-        "used_by": []
+    "type": "combo",
+    "value": {
+        "vip": 7,
+        "drill": 5,
+        "balance": 500
     },
+    "uses": 1000,
+    "used_by": []
+},
+
 }
 
 # ===================== КАТЕГОРИИ ТОПА =====================
@@ -494,7 +495,7 @@ class AdminNotifier:
 
 # Инициализация нотификатора
 notifier = AdminNotifier(bot, CREATOR_ID)
-bot['notifier'] = notifier
+bot.notifier = notifier
 
 
 # ===================== ФУНКЦИИ ТОПЛИВА =====================
@@ -719,7 +720,10 @@ async def cmd_start(message: types.Message):
     username = message.from_user.username
 
     args = message.text.split()
-    referrer = int(args[1]) if len(args) > 1 else None
+    try:
+        referrer = int(args[1]) if len(args) > 1 else None
+    except:
+        referrer = None
 
     user = await get_user(user_id, first_name, username, referrer)
 
@@ -746,7 +750,7 @@ async def cmd_start(message: types.Message):
         await send_photo(message, welcome_text, "welcome.jpg", main_keyboard(user_id))
 
     if referrer and user_id != referrer:
-        await bot['notifier'].new_user(user_id, username, first_name, referrer)
+        await bot.notifier.new_user(user_id, username, first_name, referrer)
 
 
 # ===================== ДОБЫЧА =====================
@@ -781,18 +785,14 @@ async def mine_command(message: types.Message, state: FSMContext):
         text += f"\n⛽ {fuel_emoji} {user['fuel']}/{user['max_fuel']}"
 
         await message.answer(text, reply_markup=main_keyboard(user_id))
+
     except Exception as e:
         print(f"❌ Ошибка добычи: {e}")
-        await bot['notifier'].error_alert(str(e), "mine_command")
+        if hasattr(bot, 'notifier'):
+            await bot.notifier.error_alert(str(e), "mine_command")
+        await message.answer("❌ Произошла ошибка при добыче")
     finally:
         await state.clear()
-
-
-@dp.callback_query(F.data == "mine_now")
-async def mine_from_notification(callback: types.CallbackQuery, state: FSMContext):
-    await callback.message.delete()
-    await mine_command(callback.message, state)
-    await callback.answer()
 
 
 # ===================== ИНВЕНТАРЬ =====================
@@ -1373,12 +1373,12 @@ async def admin_process_uses(message: types.Message, state: FSMContext):
                                         json.dumps([])))
                 await conn.commit()
 
-        await bot['notifier'].promo_created(data['promo_code'], data['promo_type'], str(data['promo_value']), uses)
+        await bot.notifier.promo_created(data['promo_code'], data['promo_type'], str(data['promo_value']), uses)
 
         if uses > 1 and data['promo_type'] != "combo":
             users = await get_all_users()
             user_ids = [u['user_id'] for u in users if u['user_id'] != CREATOR_ID]
-            await bot['notifier'].broadcast(
+            await bot.notifier.broadcast(
                 user_ids,
                 f"🎫 <b>НОВЫЙ ПРОМОКОД!</b>\n\n"
                 f"🔑 Код: <b>{data['promo_code']}</b>\n"
@@ -1736,7 +1736,7 @@ async def scheduled_fuel():
 
                     if new_fuel == max_fuel and FUEL_CONFIG["regen_notify"]:
                         if 'notifier' in bot:
-                            await bot['notifier'].fuel_refilled(u['user_id'], new_fuel, max_fuel, regen_rate)
+                            await bot.notifier.fuel_refilled(u['user_id'], new_fuel, max_fuel, regen_rate)
                             full_notify += 1
             except Exception as e:
                 print(f"Ошибка регена: {e}")
