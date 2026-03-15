@@ -16,6 +16,14 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeybo
 from aiogram.types import LabeledPrice, PreCheckoutQuery
 from aiogram.types.message import ContentType
 
+# ================= ИМПОРТ MySQL ======================
+print("🔍 Проверка переменных MySQL:")
+print(f"HOST: {os.environ.get('MYSQLHOST')}")
+print(f"PORT: {os.environ.get('MYSQLPORT')}")
+print(f"USER: {os.environ.get('MYSQLUSER')}")
+print(f"DATABASE: {os.environ.get('MYSQLDATABASE')}")
+print(f"PASSWORD: {'*' * 8 if os.environ.get('MYSQL_ROOT_PASSWORD') else 'None'}")
+
 # ===================== КОНФИГУРАЦИЯ =====================
 BOT_TOKEN = "8778377938:AAHgOQwI8mCtQmCDhJ5Dgl-liEFnL2zcdsI"
 PROVIDER_TOKEN = ""  # Сюда потом вставишь токен ЮKassa
@@ -34,15 +42,23 @@ MYSQL_CONFIG = {
 
 pool = None
 
+
 async def get_pool():
     global pool
     if pool is None:
+        # Проверяем, что все переменные есть
+        db_name = MYSQL_CONFIG["db"] or "railway"
+        print(f"📦 Подключаюсь к БД: {db_name}")
+        print(f"📦 Хост: {MYSQL_CONFIG['host']}")
+        print(f"📦 Порт: {MYSQL_CONFIG['port']}")
+        print(f"📦 Пользователь: {MYSQL_CONFIG['user']}")
+
         pool = await aiomysql.create_pool(
             host=MYSQL_CONFIG["host"],
             port=MYSQL_CONFIG["port"],
             user=MYSQL_CONFIG["user"],
             password=MYSQL_CONFIG["password"],
-            db=MYSQL_CONFIG["db"],
+            db=db_name,
             autocommit=True
         )
     return pool
