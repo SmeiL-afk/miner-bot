@@ -1156,29 +1156,50 @@ async def copy_ref(callback: types.CallbackQuery):
 # ===================== ЕЖЕДНЕВНЫЙ БОНУС =====================
 @dp.message(F.text == "🎁 Бонус")
 @dp.message(F.text == "🎁 Бонус")
+@dp.message(F.text == "🎁 Бонус")
 async def daily_bonus(message: types.Message):
     user_id = message.from_user.id
     user = await get_user(user_id)
     today = datetime.now().date()
 
-    if user['last_daily'] and user['last_daily'] is not None:
+    # Получаем дату последнего бонуса
+    last_bonus = user.get('last_daily')
+
+    # Проверяем, получал ли сегодня
+    if last_bonus:
         try:
-            last = datetime.fromisoformat(user['last_daily']).date()
-            if last == today:
-                await message.answer("⏳ Ты уже получал бонус сегодня!")
+            # Пробуем преобразовать в дату
+            last_date = datetime.fromisoformat(last_bonus).date()
+            if last_date == today:
+                # Считаем время до следующего бонуса
+                next_bonus = datetime.combine(today + timedelta(days=1), datetime.min.time())
+                time_left = next_bonus - datetime.now()
+                hours = int(time_left.total_seconds() // 3600)
+                minutes = int((time_left.total_seconds() % 3600) // 60)
+
+                await message.answer(
+                    f"⏳ Ты уже получал бонус сегодня!\n"
+                    f"Следующий бонус через: {hours}ч {minutes}м"
+                )
                 return
         except (ValueError, TypeError):
+            # Если дата кривая — игнорируем и выдаём бонус
             pass
 
+    # Выдаём бонус
     bonus = 50
     user['balance'] += bonus
-    user['daily_streak'] += 1
+    user['daily_streak'] = user.get('daily_streak', 0) + 1
     user['last_daily'] = datetime.now().isoformat()
-    await update_user(user_id, balance=user['balance'], daily_streak=user['daily_streak'],
+
+    await update_user(user_id,
+                      balance=user['balance'],
+                      daily_streak=user['daily_streak'],
                       last_daily=user['last_daily'])
 
     text = f"🎁 <b>ЕЖЕДНЕВНЫЙ БОНУС</b>\n\n💰 +{bonus} монет\n📆 Серия: {user['daily_streak']} дней"
 
+    # Бонус за неделю
     if user['daily_streak'] % 7 == 0:
         extra = 100
         user['balance'] += extra
