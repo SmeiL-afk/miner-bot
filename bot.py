@@ -1169,8 +1169,6 @@ async def copy_ref(callback: types.CallbackQuery):
 
 # ===================== ЕЖЕДНЕВНЫЙ БОНУС =====================
 @dp.message(F.text == "🎁 Бонус")
-@dp.message(F.text == "🎁 Бонус")
-@dp.message(F.text == "🎁 Бонус")
 async def daily_bonus(message: types.Message):
     user_id = message.from_user.id
     user = await get_user(user_id)
@@ -1182,10 +1180,8 @@ async def daily_bonus(message: types.Message):
     # Проверяем, получал ли сегодня
     if last_bonus:
         try:
-            # Пробуем преобразовать в дату
             last_date = datetime.fromisoformat(last_bonus).date()
             if last_date == today:
-                # Считаем время до следующего бонуса
                 next_bonus = datetime.combine(today + timedelta(days=1), datetime.min.time())
                 time_left = next_bonus - datetime.now()
                 hours = int(time_left.total_seconds() // 3600)
@@ -1197,10 +1193,8 @@ async def daily_bonus(message: types.Message):
                 )
                 return
         except (ValueError, TypeError):
-            # Если дата кривая — игнорируем и выдаём бонус
             pass
 
-    # Выдаём бонус
     bonus = 50
     user['balance'] += bonus
     user['daily_streak'] = user.get('daily_streak', 0) + 1
@@ -1213,7 +1207,6 @@ async def daily_bonus(message: types.Message):
 
     text = f"🎁 <b>ЕЖЕДНЕВНЫЙ БОНУС</b>\n\n💰 +{bonus} монет\n📆 Серия: {user['daily_streak']} дней"
 
-    # Бонус за неделю
     if user['daily_streak'] % 7 == 0:
         extra = 100
         user['balance'] += extra
@@ -1329,6 +1322,20 @@ async def admin_process_amount(message: types.Message, state: FSMContext):
         await message.answer("❌ Неверная сумма")
         await state.clear()
 
+@dp.callback_query(F.data == "admin_list_drills")
+async def admin_list_drills(callback: types.CallbackQuery):
+    text = "🛠 <b>СПИСОК ВСЕХ БУРОВ</b>\n\n"
+    for level, drill in DRILL_LEVELS.items():
+        text += f"{level}. {drill['name']} — +{drill['bonus']}%\n"
+        text += f"   Редкость: {drill['rarity']}\n"
+        if drill.get('price_coins', 0) > 0:
+            text += f"   💰 {drill['price_coins']} монет\n"
+        elif drill.get('price_rub', 0) > 0:
+            text += f"   💎 {drill['price_rub']}₽\n"
+        text += "\n"
+
+    await callback.message.edit_text(text, parse_mode=ParseMode.HTML)
+    await callback.answer()
 
 # ===================== УПРАВЛЕНИЕ ПРОМОКОДАМИ =====================
 @dp.message(F.text == "🎫 Промокоды")
@@ -1796,6 +1803,95 @@ async def scheduled_fuel():
 
         print(f"⛽ Реген: {regen_count} игроков, уведомлений: {full_notify}")
 
+
+@dp.message(F.text == "⛽ Статус топлива")
+async def fuel_status(message: types.Message):
+    user_id = message.from_user.id
+    user = await get_user(user_id)
+
+    if user['fuel'] >= user['max_fuel']:
+        await message.answer("⛽ У тебя **ПОЛНОЕ ТОПЛИВО**! Иди добывать! 💪")
+        return
+
+# ========================== ТОП ====================
+@dp.message(F.text == "📊 Топ")
+async def top_menu(message: types.Message):
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💰 По монетам", callback_data="top_balance")],
+        [InlineKeyboardButton(text="👥 По рефералам", callback_data="top_referrals")],
+        [InlineKeyboardButton(text="🗺️ По локациям", callback_data="top_locations")],
+        [InlineKeyboardButton(text="❌ Закрыть", callback_data="close")]
+    ])
+    await message.answer("📊 ВЫБЕРИ КАТЕГОРИЮ ТОПА", reply_markup=kb)
+
+
+@dp.callback_query(F.data.startswith("top_"))
+async def top_categories(callback: types.CallbackQuery):
+    users = await get_all_users()
+    cat = callback.data
+
+    if cat == "top_balance":
+        sorted_users = sorted(users, key=lambda x: x['balance'], reverse=True)[:10]
+        title = "💰 ТОП ПО МОНЕТАМ"
+        value_key = 'balance'
+    elif cat == "top_referrals":
+        sorted_users = sorted(users, key=lambda x: x['referral_count'], reverse=True)[:10]
+        title = "👥 ТОП ПО РЕФЕРАЛАМ"
+        value_key = 'referral_count'
+    elif cat == "top_locations":
+        sorted_users = sorted(users, key=lambda x: x['current_location'], reverse=True)[:10]
+        title = "🗺️ ТОП ПО ЛОКАЦИЯМ"
+        value_key = 'current_location'
+    else:
+        await callback.message.delete()
+        return
+
+    text = f"{title}\n\n"
+    medals = ["🥇", "🥈", "🥉"]
+    for i, u in enumerate(sorted_users, 1):
+        medal = medals[i - 1] if i <= 3 else f"{i}."
+        name = u['first_name'] or f"ID {u['user_id']}"
+        value = u.get(value_key, 0)
+        text += f"{medal} {name} — {value}\n"
+
+    await callback.message.edit_text(text)
+    await callback.answer()
+
+# ===================== УПРАВЛЕНИЕ ПОКУПКАМИ =================
+@dp.callback_query(F.data.startswith("buy_drill_"))
+async def buy_drill(callback: types.CallbackQuery):
+    level = int(callback.data.split("_")[2])
+    user_id = callback.from_user.id
+    user = await get_user(user_id)
+    drill = DRILL_LEVELS[level]
+
+    # Проверяем, не куплен ли уже
+    if user['drill_level'] >= level:
+        await callback.answer("❌ У тебя уже есть этот бур или лучше!", show_alert=True)
+        return
+
+    # Проверка цены (для монет)
+    if drill.get('price_coins', 0) > 0:
+        if user['balance'] < drill['price_coins']:
+            await callback.answer(f"❌ Не хватает {drill['price_coins'] - user['balance']}💰", show_alert=True)
+            return
+
+        user['balance'] -= drill['price_coins']
+        user['drill_level'] = level
+        await update_user(user_id, balance=user['balance'], drill_level=level)
+
+        await callback.message.edit_text(
+            f"✅ <b>Поздравляем с покупкой!</b>\n\n"
+            f"Ты купил: {drill['name']}\n"
+            f"⚡️ Бонус: +{drill['bonus']}%\n"
+            f"💰 Остаток: {user['balance']} монет"
+        )
+
+    # Для донатных буров (за рубли)
+    elif drill.get('price_rub', 0) > 0:
+        await callback.answer("💎 Покупка за рубли временно недоступна", show_alert=True)
+
+    await callback.answer()
 
 # ===================== ЗАПУСК =====================
 async def main():
