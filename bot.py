@@ -221,6 +221,14 @@ async def init_db():
     p = await get_pool()
     async with p.acquire() as conn:
         async with conn.cursor() as cur:
+            # === НОВЫЙ КОД: создаём базу данных ===
+            db_name = MYSQL_CONFIG["db"] or "railway"
+            await cur.execute(f"CREATE DATABASE IF NOT EXISTS {db_name}")
+            await cur.execute(f"USE {db_name}")
+            print(f"✅ База данных {db_name} готова")
+            # =======================================
+
+            # Дальше идёт твой старый код создания таблиц
             await cur.execute('''
                               CREATE TABLE IF NOT EXISTS users
                               (
@@ -311,6 +319,7 @@ async def init_db():
                                   )
                               ''')
             await conn.commit()
+            print("✅ Таблицы созданы")
 
 
 async def get_user(user_id, first_name=None, username=None, referrer=None):
