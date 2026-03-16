@@ -605,14 +605,17 @@ async def edit_photo(callback: types.CallbackQuery, text: str, image_name: str, 
 
 # ===================== ИГРОВЫЕ ФУНКЦИИ =====================
 def get_display_name(user_id, user_data):
+    """Возвращает имя пользователя без ID, только юзернейм или имя"""
     if user_id == CREATOR_ID:
-        return "<b><i>👑 Создатель</i></b>"
+        return "👑 Создатель"
+
     if user_data.get('first_name'):
-        name = user_data['first_name'][:15]
-        return f"👤 {name}"
+        return f"👤 {user_data['first_name'][:15]}"
+
     if user_data.get('username'):
         return f"👤 @{user_data['username']}"
-    return f"👤 Игрок {user_id}"
+
+    return "👤 Игрок"  # без ID
 
 
 def mine_resources(user):
@@ -1177,11 +1180,12 @@ async def daily_bonus(message: types.Message):
     # Получаем дату последнего бонуса
     last_bonus = user.get('last_daily')
 
-    # Проверяем, получал ли сегодня
-    if last_bonus:
+    # Если есть last_bonus и он не None
+    if last_bonus and last_bonus != "None" and last_bonus != "null":
         try:
             last_date = datetime.fromisoformat(last_bonus).date()
             if last_date == today:
+                # Считаем время до следующего бонуса
                 next_bonus = datetime.combine(today + timedelta(days=1), datetime.min.time())
                 time_left = next_bonus - datetime.now()
                 hours = int(time_left.total_seconds() // 3600)
@@ -1193,8 +1197,10 @@ async def daily_bonus(message: types.Message):
                 )
                 return
         except (ValueError, TypeError):
+            # Если дата кривая — выдаём бонус
             pass
 
+    # Выдаём бонус
     bonus = 50
     user['balance'] += bonus
     user['daily_streak'] = user.get('daily_streak', 0) + 1
@@ -1828,6 +1834,7 @@ async def top_menu(message: types.Message):
 @dp.callback_query(F.data.startswith("top_"))
 async def top_categories(callback: types.CallbackQuery):
     users = await get_all_users()
+    name = get_display_name(u['user_id'], u)
     cat = callback.data
 
     if cat == "top_balance":
