@@ -16,6 +16,11 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeybo
 from aiogram.types import LabeledPrice, PreCheckoutQuery
 from aiogram.types.message import ContentType
 
+# ================ ЗАЩИТА =======================
+import sys
+print(f"Python version: {sys.version}")
+print(f"Running file: {__file__}")
+
 # ================= ИМПОРТ MySQL ======================
 print("🔍 Проверка переменных MySQL:")
 print(f"HOST: {os.environ.get('MYSQLHOST')}")
