@@ -1298,6 +1298,68 @@ async def daily_bonus(message: types.Message):
     await message.answer(text, parse_mode=ParseMode.HTML)
 
 
+@dp.callback_query(F.data == "enter_startvip")
+async def enter_startvip(callback: types.CallbackQuery, state: FSMContext):
+    """Автоматическая активация промокода STARTVIP"""
+    await callback.message.delete()
+    await callback.message.answer("⏳ Активирую промокод STARTVIP...")
+
+    # Создаём искусственное сообщение с кодом
+    class FakeMessage:
+        def __init__(self, text, from_user):
+            self.text = text
+            self.from_user = from_user
+
+    fake_msg = FakeMessage("STARTVIP", callback.from_user)
+    await process_promo(fake_msg, state)
+    await callback.answer()
+
+
+@dp.message(PromoStates.waiting_for_promo)
+async def process_promo(message: types.Message, state: FSMContext):
+    """Обработка ввода промокода"""
+    user_id = message.from_user.id
+    user = await get_user(user_id)
+    promo_code = message.text.strip().upper()
+    promos = await get_promo_codes_db()
+
+    if promo_code not in promos:
+        await message.answer("❌ Промокод не найден", reply_markup=main_keyboard(user_id))
+        await state.clear()
+        return
+
+    promo = promos[promo_code]
+    used_promos = json.loads(user['used_promos']) if isinstance(user['used_promos'], str) else user['used_promos']
+
+    if user_id in promo['used_by']:
+        await message.answer("❌ Ты уже использовал этот промокод", reply_markup=main_keyboard(user_id))
+        await state.clear()
+        return
+
+    if len(promo['used_by']) >= promo['uses']:
+        await message.answer("❌ Промокод закончился", reply_markup=main_keyboard(user_id))
+        await state.clear()
+        return
+
+    reward_text = apply_promo_reward(user, promo)
+    promo['used_by'].append(user_id)
+    used_promos.append(promo_code)
+
+    await update_user(user_id,
+                      balance=user['balance'],
+                      vip_until=user['vip_until'],
+                      boost_until=user['boost_until'],
+                      drill_level=user['drill_level'],
+                      used_promos=used_promos)
+
+    await update_promo_db(promo_code, used_by=promo['used_by'])
+
+    await message.answer(
+        f"✅ Промокод активирован!\n\nТы получил:\n{reward_text}",
+        reply_markup=main_keyboard(user_id)
+    )
+    await state.clear()
+
 # ===================== ПОМОЩЬ =====================
 @dp.message(F.text == "❓ Помощь")
 async def help_cmd(message: types.Message):
@@ -2171,6 +2233,47 @@ async def happy_hours_info(message: types.Message):
         )
 
     await message.answer(text, parse_mode=ParseMode.HTML)
+
+# ================= ВЕРНУТСЯ НАЗАД ====================
+@dp.callback_query(F.data == "back_to_start")
+async def back_to_start(callback: types.CallbackQuery):
+    """Возврат в главное приветствие"""
+    await callback.message.delete()
+
+    # Пересоздаём приветственное сообщение
+    user_id = callback.from_user.id
+    first_name = callback.from_user.first_name
+    username = callback.from_user.username
+    user = await get_user(user_id, first_name, username)
+
+    welcome_text = (
+        f"👋 <b>Добро пожаловать в Miner Game, {first_name or 'шахтёр'}!</b>\n\n"
+        f"⛏ <b>ЧТО ТУТ ДЕЛАТЬ:</b>\n"
+        f"• Добывай ресурсы в разных локациях\n"
+        f"• Продавай руду и улучшай бур\n"
+        f"• Открывай новые локации\n"
+        f"• Приглашай друзей и получай бонусы\n\n"
+
+        f"📊 <b>ТВОИ ДАННЫЕ:</b>\n"
+        f"💰 Баланс: {user['balance']} монет\n"
+        f"⛽ Топливо: {user['fuel']}/{user['max_fuel']}\n"
+        f"🛠 Бур: {DRILL_LEVELS[user['drill_level']]['name']}\n"
+        f"🗺️ Локация: {LOCATIONS[user['current_location']]['name']}\n\n"
+
+        f"🎁 <b>СОВЕТ:</b>\n"
+        f"• Заходи каждый день за бонусом\n"
+        f"• С 12:00 до 14:00 — удвоенная добыча!\n"
+        f"• Введи промокод <b>STARTVIP</b> для подарка"
+    )
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⛏ Начать добычу", callback_data="mine_now")],
+        [InlineKeyboardButton(text="🎁 Ввести STARTVIP", callback_data="enter_startvip")],
+        [InlineKeyboardButton(text="📋 Правила игры", callback_data="game_rules")]
+    ])
+
+    await send_photo(callback.message, welcome_text, "welcome.jpg", kb)
+    await callback.answer()
 
 # ===================== ЗАПУСК =====================
 async def main():
