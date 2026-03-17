@@ -1218,6 +1218,8 @@ async def daily_bonus(message: types.Message):
     user['balance'] += bonus
     user['daily_streak'] = user.get('daily_streak', 0) + 1
     user['last_daily'] = datetime.now().isoformat()
+    print(f"✅ Сохраняю last_daily: {user['last_daily']}")
+    print(f"✅ Сохраняю daily_streak: {user['daily_streak']}")
 
     await update_user(user_id,
                       balance=user['balance'],
