@@ -300,7 +300,18 @@ async def init_db():
                                   total_donated INT DEFAULT 0
                                   )
                               ''')
+            # === ДОБАВЛЯЕМ НЕДОСТАЮЩИЕ ПОЛЯ ===
+            try:
+                await cur.execute("ALTER TABLE users ADD COLUMN last_daily DATETIME")
+                print("✅ Поле last_daily добавлено")
+            except:
+                print("⚠️ Поле last_daily уже существует")
 
+            try:
+                await cur.execute("ALTER TABLE users ADD COLUMN daily_streak INT DEFAULT 0")
+                print("✅ Поле daily_streak добавлено")
+            except:
+                print("⚠️ Поле daily_streak уже существует")
             await cur.execute('''
                               CREATE TABLE IF NOT EXISTS promo_codes
                               (
@@ -1653,6 +1664,7 @@ async def admin_exit(message: types.Message):
 # ===================== ДОНАТ =====================
 @dp.message(F.text == "💎 Донат")
 async def donate_menu(message: types.Message):
+    """Главное меню доната"""
     text = (
         "💎 <b>ПОДДЕРЖКА ПРОЕКТА</b>\n\n"
         "⛽ <b>Топливо:</b>\n"
@@ -1672,61 +1684,43 @@ async def donate_menu(message: types.Message):
         "🛠 <b>Легендарные буры:</b>\n"
         "• ⚡ Грозовой бур — 1000₽\n"
         "• 🌈 Кристальный бур — 1500₽\n"
-        "• 🕯️ Теневой бур — 1500₽"
+        "• 🕯️ Теневой бур — 1500₽\n\n"
+        "💳 Оплата временно недоступна. Скоро подключим!"
     )
 
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="⛽ Топливо", callback_data="donate_fuel_menu")],
-        [InlineKeyboardButton(text="👑 VIP статусы", callback_data="donate_vip_menu")],
-        [InlineKeyboardButton(text="⚡️ Бусты", callback_data="donate_boost_menu")],
-        [InlineKeyboardButton(text="🛠 Легендарные буры", callback_data="donate_drills_menu")],
+        [InlineKeyboardButton(text="⛽ Топливо", callback_data="donate_fuel")],
+        [InlineKeyboardButton(text="👑 VIP статусы", callback_data="donate_vip")],
+        [InlineKeyboardButton(text="⚡️ Бусты", callback_data="donate_boost")],
+        [InlineKeyboardButton(text="🛠 Легендарные буры", callback_data="donate_drills")],
         [InlineKeyboardButton(text="◀️ Назад", callback_data="back_main")]
     ])
 
     await message.answer(text, reply_markup=kb, parse_mode=ParseMode.HTML)
 
 
-@dp.callback_query(F.data == "donate_fuel_menu")
-async def donate_fuel_menu(callback: types.CallbackQuery):
-    text = "⛽ <b>ТОПЛИВО ЗА ДОНАТ</b>\n\n"
-    for key, fuel in DONATE_FUEL.items():
-        text += f"• {fuel['name']} — {fuel['fuel']} ед.\n"
-        text += f"  💎 Цена: {fuel['price_rub']}₽\n\n"
-
-    kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="⛽ 50 ед. - 99₽", callback_data="donate_fuel_small")],
-        [InlineKeyboardButton(text="⛽⛽ 150 ед. - 249₽", callback_data="donate_fuel_medium")],
-        [InlineKeyboardButton(text="⛽⛽⛽ 300 ед. - 499₽", callback_data="donate_fuel_large")],
-        [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_donate")]
-    ])
-
-    await callback.message.edit_text(text, reply_markup=kb, parse_mode=ParseMode.HTML)
-    await callback.answer()
+@dp.callback_query(F.data == "donate_fuel")
+async def donate_fuel(callback: types.CallbackQuery):
+    """Раздел топлива в донате"""
+    await callback.answer("⛽ Покупка топлива за рубли временно недоступна. Скоро будет!", show_alert=True)
 
 
-@dp.callback_query(F.data.startswith("donate_fuel_"))
-async def donate_fuel_buy(callback: types.CallbackQuery):
-    size = callback.data.replace("donate_fuel_", "")
-    fuel_item = DONATE_FUEL[size]
-
-    prices = [LabeledPrice(label=fuel_item['name'], amount=fuel_item['price_rub'] * 100)]
-
-    await callback.message.answer_invoice(
-        title=fuel_item['name'],
-        description=f"{fuel_item['fuel']} единиц топлива",
-        provider_token=PROVIDER_TOKEN,
-        currency="rub",
-        prices=prices,
-        start_parameter="donate_fuel",
-        payload=f"fuel_{size}_{fuel_item['fuel']}"
-    )
-    await callback.answer()
+@dp.callback_query(F.data == "donate_vip")
+async def donate_vip(callback: types.CallbackQuery):
+    """Раздел VIP в донате"""
+    await callback.answer("👑 Покупка VIP временно недоступна. Скоро будет!", show_alert=True)
 
 
-@dp.callback_query(F.data == "back_to_donate")
-async def back_to_donate(callback: types.CallbackQuery):
-    await donate_menu(callback.message)
-    await callback.answer()
+@dp.callback_query(F.data == "donate_boost")
+async def donate_boost(callback: types.CallbackQuery):
+    """Раздел бустов в донате"""
+    await callback.answer("⚡️ Покупка бустов временно недоступна. Скоро будет!", show_alert=True)
+
+
+@dp.callback_query(F.data == "donate_drills")
+async def donate_drills(callback: types.CallbackQuery):
+    """Раздел легендарных буров в донате"""
+    await callback.answer("🛠 Покупка легендарных буров временно недоступна. Скоро будет!", show_alert=True)
 
 
 # ===================== УСПЕШНЫЙ ПЛАТЕЖ =====================
@@ -1822,46 +1816,84 @@ async def fuel_status(message: types.Message):
 # ========================== ТОП ====================
 @dp.message(F.text == "📊 Топ")
 async def top_menu(message: types.Message):
+    """Главное меню топа"""
     kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="💰 По монетам", callback_data="top_balance")],
         [InlineKeyboardButton(text="👥 По рефералам", callback_data="top_referrals")],
         [InlineKeyboardButton(text="🗺️ По локациям", callback_data="top_locations")],
         [InlineKeyboardButton(text="❌ Закрыть", callback_data="close")]
     ])
-    await message.answer("📊 ВЫБЕРИ КАТЕГОРИЮ ТОПА", reply_markup=kb)
+    await message.answer("📊 <b>ВЫБЕРИ КАТЕГОРИЮ ТОПА</b>", reply_markup=kb, parse_mode=ParseMode.HTML)
 
 
-@dp.callback_query(F.data.startswith("top_"))
-async def top_categories(callback: types.CallbackQuery):
+@dp.callback_query(F.data == "top_balance")
+async def top_balance(callback: types.CallbackQuery):
+    """Топ по монетам"""
     users = await get_all_users()
-    name = get_display_name(u['user_id'], u)
-    cat = callback.data
+    sorted_users = sorted(users, key=lambda x: x['balance'], reverse=True)[:10]
+    text = "💰 <b>ТОП ПО МОНЕТАМ</b>\n\n"
 
-    if cat == "top_balance":
-        sorted_users = sorted(users, key=lambda x: x['balance'], reverse=True)[:10]
-        title = "💰 ТОП ПО МОНЕТАМ"
-        value_key = 'balance'
-    elif cat == "top_referrals":
-        sorted_users = sorted(users, key=lambda x: x['referral_count'], reverse=True)[:10]
-        title = "👥 ТОП ПО РЕФЕРАЛАМ"
-        value_key = 'referral_count'
-    elif cat == "top_locations":
-        sorted_users = sorted(users, key=lambda x: x['current_location'], reverse=True)[:10]
-        title = "🗺️ ТОП ПО ЛОКАЦИЯМ"
-        value_key = 'current_location'
-    else:
-        await callback.message.delete()
-        return
-
-    text = f"{title}\n\n"
     medals = ["🥇", "🥈", "🥉"]
     for i, u in enumerate(sorted_users, 1):
         medal = medals[i - 1] if i <= 3 else f"{i}."
-        name = u['first_name'] or f"ID {u['user_id']}"
-        value = u.get(value_key, 0)
-        text += f"{medal} {name} — {value}\n"
+        name = get_display_name(u['user_id'], u)
+        text += f"{medal} {name} — {u['balance']}💰\n"
 
-    await callback.message.edit_text(text)
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="top_menu")],
+        [InlineKeyboardButton(text="❌ Закрыть", callback_data="close")]
+    ])
+    await callback.message.edit_text(text, reply_markup=kb, parse_mode=ParseMode.HTML)
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "top_referrals")
+async def top_referrals(callback: types.CallbackQuery):
+    """Топ по рефералам"""
+    users = await get_all_users()
+    sorted_users = sorted(users, key=lambda x: x['referral_count'], reverse=True)[:10]
+    text = "👥 <b>ТОП ПО РЕФЕРАЛАМ</b>\n\n"
+
+    medals = ["🥇", "🥈", "🥉"]
+    for i, u in enumerate(sorted_users, 1):
+        medal = medals[i - 1] if i <= 3 else f"{i}."
+        name = get_display_name(u['user_id'], u)
+        text += f"{medal} {name} — {u['referral_count']} 👥\n"
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="top_menu")],
+        [InlineKeyboardButton(text="❌ Закрыть", callback_data="close")]
+    ])
+    await callback.message.edit_text(text, reply_markup=kb, parse_mode=ParseMode.HTML)
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "top_locations")
+async def top_locations(callback: types.CallbackQuery):
+    """Топ по локациям"""
+    users = await get_all_users()
+    sorted_users = sorted(users, key=lambda x: x['current_location'], reverse=True)[:10]
+    text = "🗺️ <b>ТОП ПО ЛОКАЦИЯМ</b>\n\n"
+
+    medals = ["🥇", "🥈", "🥉"]
+    for i, u in enumerate(sorted_users, 1):
+        medal = medals[i - 1] if i <= 3 else f"{i}."
+        name = get_display_name(u['user_id'], u)
+        loc_name = LOCATIONS[u['current_location']]['name']
+        text += f"{medal} {name} — {loc_name}\n"
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="top_menu")],
+        [InlineKeyboardButton(text="❌ Закрыть", callback_data="close")]
+    ])
+    await callback.message.edit_text(text, reply_markup=kb, parse_mode=ParseMode.HTML)
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "top_menu")
+async def back_to_top_menu(callback: types.CallbackQuery):
+    """Возврат в главное меню топа"""
+    await top_menu(callback.message)
     await callback.answer()
 
 # ===================== УПРАВЛЕНИЕ ПОКУПКАМИ =================
@@ -1898,6 +1930,119 @@ async def buy_drill(callback: types.CallbackQuery):
     elif drill.get('price_rub', 0) > 0:
         await callback.answer("💎 Покупка за рубли временно недоступна", show_alert=True)
 
+    await callback.answer()
+
+# ===================== МАГАЗИН - ВСЕ КНОПКИ =====================
+@dp.callback_query(F.data == "shop_drills")
+async def shop_drills_callback(callback: types.CallbackQuery):
+    """Кнопка 'Купить бур' в магазине"""
+    text = "🛠 <b>МАГАЗИН БУРОВ</b>\n\n"
+    text += "Скоро здесь появятся буры за монеты и рубли!\n"
+    text += "Следи за обновлениями! 🚀"
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Назад в магазин", callback_data="back_to_shop")]
+    ])
+
+    await callback.message.edit_text(text, reply_markup=kb, parse_mode=ParseMode.HTML)
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "shop_fuel")
+async def shop_fuel_callback(callback: types.CallbackQuery):
+    """Кнопка 'Купить топливо' в магазине"""
+    text = "⛽ <b>ТОПЛИВО В МАГАЗИНЕ</b>\n\n"
+    text += "📦 Доступные канистры:\n\n"
+    text += "• ⛽ Малая канистра — 10 топлива за 500💰\n"
+    text += "• ⛽⛽ Средняя канистра — 25 топлива за 1000💰\n"
+    text += "• ⛽⛽⛽ Большая канистра — 50 топлива за 2000💰\n\n"
+    text += "💳 Покупка будет доступна после подключения платежной системы!"
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Назад в магазин", callback_data="back_to_shop")]
+    ])
+
+    await callback.message.edit_text(text, reply_markup=kb, parse_mode=ParseMode.HTML)
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "shop_sell")
+async def shop_sell_callback(callback: types.CallbackQuery):
+    """Кнопка 'Продать руду' в магазине"""
+    user_id = callback.from_user.id
+    user = await get_user(user_id)
+    inv = json.loads(user['inventory'])
+
+    text = "💰 <b>ПРОДАЖА РУДЫ</b>\n\n"
+    total = 0
+    kb = []
+
+    for r, data in RARITIES.items():
+        count = inv.get(r, 0)
+        if count > 0:
+            price = (data['min'] + data['max']) // 2
+            total_value = count * price
+            text += f"{data['emoji']} {data['name']}: {count} шт. × {price} = {total_value}💰\n"
+            total += total_value
+            kb.append([InlineKeyboardButton(text=f"Продать {data['name']}", callback_data=f"sell_{r}")])
+
+    if total == 0:
+        text += "📦 У тебя нет руды для продажи"
+    else:
+        text += f"\n💰 <b>Всего можно получить: {total} монет</b>"
+        kb.append([InlineKeyboardButton(text="💰 Продать всё", callback_data="sell_all")])
+
+    kb.append([InlineKeyboardButton(text="◀️ Назад в магазин", callback_data="back_to_shop")])
+    await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
+                                     parse_mode=ParseMode.HTML)
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("sell_"))
+async def process_sell(callback: types.CallbackQuery):
+    """Обработка продажи руды"""
+    user_id = callback.from_user.id
+    user = await get_user(user_id)
+    inv = json.loads(user['inventory'])
+
+    if callback.data == "sell_all":
+        total = 0
+        for r in RARITIES:
+            count = inv.get(r, 0)
+            if count > 0:
+                price = (RARITIES[r]['min'] + RARITIES[r]['max']) // 2
+                total += count * price
+                inv[r] = 0
+        user['balance'] += total
+        user['total_earned'] += total
+        await update_user(user_id, balance=user['balance'], inventory=inv, total_earned=user['total_earned'])
+        await callback.message.edit_text(f"✅ Продано всё! Получено: {total}💰")
+    else:
+        r = callback.data.split("_")[1]
+        count = inv.get(r, 0)
+        if count > 0:
+            price = (RARITIES[r]['min'] + RARITIES[r]['max']) // 2
+            total = count * price
+            user['balance'] += total
+            user['total_earned'] += total
+            inv[r] = 0
+            await update_user(user_id, balance=user['balance'], inventory=inv, total_earned=user['total_earned'])
+            await callback.message.edit_text(f"✅ Продано {RARITIES[r]['name']}! Получено: {total}💰")
+
+    await callback.answer()
+
+
+@dp.callback_query(F.data == "back_to_shop")
+async def back_to_shop(callback: types.CallbackQuery):
+    """Возврат в главное меню магазина"""
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🛠 Купить бур", callback_data="shop_drills")],
+        [InlineKeyboardButton(text="⛽ Купить топливо", callback_data="shop_fuel")],
+        [InlineKeyboardButton(text="💰 Продать руду", callback_data="shop_sell")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="back_main")]
+    ])
+    await callback.message.edit_text("🏪 <b>МАГАЗИН</b>\n\nВыбери категорию:", reply_markup=kb,
+                                     parse_mode=ParseMode.HTML)
     await callback.answer()
 
 # ===================== ЗАПУСК =====================
