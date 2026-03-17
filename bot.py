@@ -761,39 +761,100 @@ async def cmd_start(message: types.Message):
     first_name = message.from_user.first_name
     username = message.from_user.username
 
+    # Проверяем реферала
     args = message.text.split()
-    try:
-        referrer = int(args[1]) if len(args) > 1 else None
-    except:
-        referrer = None
+    referrer = int(args[1]) if len(args) > 1 else None
 
     user = await get_user(user_id, first_name, username, referrer)
 
-    is_new = user['balance'] == 100 or user['balance'] == 200
+    # Приветственный текст
+    welcome_text = (
+        f"👋 <b>Добро пожаловать в Miner Game, {first_name or 'шахтёр'}!</b>\n\n"
+        f"⛏ <b>ЧТО ТУТ ДЕЛАТЬ:</b>\n"
+        f"• Добывай ресурсы в разных локациях\n"
+        f"• Продавай руду и улучшай бур\n"
+        f"• Открывай новые локации\n"
+        f"• Приглашай друзей и получай бонусы\n\n"
 
-    welcome_text = f"👋 Привет, {first_name or 'шахтёр'}!\n\n"
-    welcome_text += f"💰 Твой баланс: {user['balance']} монет\n"
-    welcome_text += f"⛽ Топливо: {user['fuel']}/100\n\n"
+        f"📊 <b>ТВОИ ДАННЫЕ:</b>\n"
+        f"💰 Баланс: {user['balance']} монет\n"
+        f"⛽ Топливо: {user['fuel']}/{user['max_fuel']}\n"
+        f"🛠 Бур: {DRILL_LEVELS[user['drill_level']]['name']}\n"
+        f"🗺️ Локация: {LOCATIONS[user['current_location']]['name']}\n\n"
 
-    if is_new:
-        welcome_text += (
-            "🎁 <b>ПОДАРОК ДЛЯ НОВИЧКА!</b>\n\n"
-            "Введи промокод <b>STARTVIP</b> и получи:\n"
-            "👑 VIP на 7 дней\n"
-            "🛠 Элитный бур (5 уровень)\n"
-            "💰 500 монет\n\n"
-            "👇 Нажми на кнопку ниже!"
-        )
-        kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🎫 Ввести STARTVIP", callback_data="enter_startvip")]
-        ])
-        await send_photo(message, welcome_text, "welcome.jpg", kb)
-    else:
-        await send_photo(message, welcome_text, "welcome.jpg", main_keyboard(user_id))
+        f"🎁 <b>СОВЕТ:</b>\n"
+        f"• Заходи каждый день за бонусом\n"
+        f"• С 12:00 до 14:00 — удвоенная добыча!\n"
+        f"• Введи промокод <b>STARTVIP</b> для подарка"
+    )
 
+    # Кнопки для быстрого старта
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="⛏ Начать добычу", callback_data="mine_now")],
+        [InlineKeyboardButton(text="🎁 Ввести STARTVIP", callback_data="enter_startvip")],
+        [InlineKeyboardButton(text="📋 Правила игры", callback_data="game_rules")]
+    ])
+
+    await send_photo(message, welcome_text, "welcome.jpg", kb)
+
+    # Уведомление админу о новом игроке
     if referrer and user_id != referrer:
         await bot.notifier.new_user(user_id, username, first_name, referrer)
 
+
+@dp.callback_query(F.data == "game_rules")
+async def game_rules(callback: types.CallbackQuery):
+    """Подробные правила игры"""
+    text = (
+        "📋 <b>ПРАВИЛА ИГРЫ MINER GAME</b>\n\n"
+
+        "⛏ <b>ДОБЫЧА:</b>\n"
+        "• Каждое нажатие тратит 1 топливо\n"
+        "• Топливо восстанавливается автоматически: +5 каждые 10 мин\n"
+        "• VIP восстанавливает +7 каждые 10 мин\n"
+        "• В разных локациях разный шанс на редкую руду\n\n"
+
+        "🛠 <b>БУРЫ:</b>\n"
+        "• Чем выше уровень бура, тем больше добыча\n"
+        "• Улучшай бур за монеты в магазине\n"
+        "• Легендарные буры дают огромный бонус\n\n"
+
+        "🗺️ <b>ЛОКАЦИИ:</b>\n"
+        "• Шахта 1 — бесплатно, для новичков\n"
+        "• Пустыня — 10 000 монет, +шанс на редкую\n"
+        "• Ледяные копи — 50 000 монет, +шанс на эпическую\n"
+        "• Вулкан — 200 000 монет, +шанс на легендарную\n"
+        "• Небесные копи — 500 000 монет + VIP\n"
+        "• Космос — 1 000 000 монет + VIP\n\n"
+
+        "👥 <b>РЕФЕРАЛЫ:</b>\n"
+        "• За друга: +200 монет\n"
+        "• Другу: +100 монет\n"
+        "• 15% от донатов друзей\n\n"
+
+        "🎁 <b>БОНУСЫ И ИВЕНТЫ:</b>\n"
+        "• Ежедневный бонус — заходи каждый день\n"
+        "• Счастливые часы — с 12:00 до 14:00 x2 добыча\n"
+        "• Промокоды — вводи и получай подарки\n\n"
+
+        "💎 <b>ДОНАТ:</b>\n"
+        "• Покупка топлива, VIP, бустов\n"
+        "• Легендарные буры за рубли\n"
+        "• Поддержи проект и получай преимущества"
+    )
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_start")]
+    ])
+
+    await callback.message.edit_text(text, reply_markup=kb, parse_mode=ParseMode.HTML)
+    await callback.answer()
+
+@dp.callback_query(F.data == "back_to_start")
+async def back_to_start(callback: types.CallbackQuery):
+    """Возврат в главное меню"""
+    await cmd_start(callback.message)
+    await callback.answer()
 
 # ===================== ДОБЫЧА =====================
 @dp.message(F.text == "⛏ Добывать", StateFilter(None))
