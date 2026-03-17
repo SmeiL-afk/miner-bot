@@ -714,7 +714,7 @@ def main_keyboard(user_id=None):
         [KeyboardButton(text="🏪 Магазин"), KeyboardButton(text="📊 Топ")],
         [KeyboardButton(text="👤 Профиль"), KeyboardButton(text="👥 Рефералы")],
         [KeyboardButton(text="⛽ Статус топлива"), KeyboardButton(text="💎 Донат")],
-        # [KeyboardButton(text="🎁 Бонус"), KeyboardButton(text="❓ Помощь")]  ← закомментировано
+        [KeyboardButton(text="🎁 Счастливые часы"), KeyboardButton(text="❓ Помощь")]
     ]
     if user_id == CREATOR_ID:
         kb.append([KeyboardButton(text="👑 Админка")])
@@ -2055,12 +2055,69 @@ async def close_message(callback: types.CallbackQuery):
     await callback.message.delete()
     await callback.answer()
 
+async def happy_hours_start(self):
+    """Уведомление о начале счастливых часов"""
+    text = (
+        "🎁 <b>СЧАСТЛИВЫЕ ЧАСЫ НАЧАЛИСЬ!</b>\n\n"
+        "⏰ С 12:00 до 14:00 действует <b>УДВОЕННАЯ ДОБЫЧА</b>!\n"
+        "⛏ Каждая добыча приносит в 2 раза больше ресурсов!\n\n"
+        "🔥 Успей воспользоваться!"
+    )
+    users = await get_all_users()
+    await self.broadcast([u['user_id'] for u in users], text)
+
+def is_happy_hours() -> bool:
+    """Проверяет, активны ли сейчас счастливые часы"""
+    now = datetime.now().time()
+    start = datetime.strptime("12:00", "%H:%M").time()
+    end = datetime.strptime("14:00", "%H:%M").time()
+    return start <= now <= end
+
+
+async def happy_hours_scheduler():
+    """Планировщик счастливых часов"""
+    while True:
+        now = datetime.now()
+
+        # Проверяем каждую минуту
+        if now.hour == 11 and now.minute == 55:  # За 5 минут до начала
+            await asyncio.sleep(5 * 60)  # Ждём до 12:00
+            if is_happy_hours() and hasattr(bot, 'notifier'):
+                await bot.notifier.happy_hours_start()
+
+        await asyncio.sleep(60)
+
+
+@dp.message(F.text == "🎁 Счастливые часы")
+async def happy_hours_info(message: types.Message):
+    """Информация о счастливых часах"""
+    if is_happy_hours():
+        time_left = datetime.combine(datetime.today(), datetime.strptime("14:00", "%H:%M").time()) - datetime.now()
+        minutes_left = int(time_left.total_seconds() // 60)
+
+        text = (
+            "🎁 <b>СЧАСТЛИВЫЕ ЧАСЫ АКТИВНЫ!</b>\n\n"
+            f"⏰ Осталось: <b>{minutes_left} минут</b>\n"
+            f"⚡️ Множитель добычи: <b>x2</b>\n\n"
+            f"⛏ Скорее добывай, пока время не вышло!"
+        )
+    else:
+        text = (
+            "🎁 <b>СЧАСТЛИВЫЕ ЧАСЫ</b>\n\n"
+            f"⏰ Время проведения: <b>12:00 - 14:00</b>\n"
+            f"⚡️ Множитель добычи: <b>x2</b>\n\n"
+            f"Приходи в это время, чтобы получать вдвое больше ресурсов!"
+        )
+
+    await message.answer(text, parse_mode=ParseMode.HTML)
+
 # ===================== ЗАПУСК =====================
 async def main():
     print("🚀 Бот запускается...")
     await init_db()
     await bot.delete_webhook(drop_pending_updates=True)
     asyncio.create_task(scheduled_fuel())
+    asyncio.create_task(happy_hours_scheduler())
     await dp.start_polling(bot)
 
 
