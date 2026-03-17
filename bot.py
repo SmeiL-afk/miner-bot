@@ -1399,6 +1399,42 @@ def apply_promo_reward(user, promo_data):
 
     return ""
 
+@dp.callback_query(F.data == "enter_startvip")
+async def enter_startvip_simple(callback: types.CallbackQuery):
+    """Простая активация STARTVIP без FSM"""
+    user_id = callback.from_user.id
+    user = await get_user(user_id)
+
+    # Проверяем, использовал ли уже
+    used = json.loads(user.get('used_promos', '[]'))
+    if 'STARTVIP' in used:
+        await callback.message.edit_text("❌ Ты уже активировал этот промокод!")
+        await callback.answer()
+        return
+
+    # Начисляем бонус
+    user['balance'] += 500
+    user['vip_until'] = (datetime.now() + timedelta(days=7)).isoformat()
+    user['drill_level'] = 5
+    used.append('STARTVIP')
+
+    await update_user(user_id,
+                      balance=user['balance'],
+                      vip_until=user['vip_until'],
+                      drill_level=5,
+                      used_promos=json.dumps(used))
+
+    await callback.message.edit_text(
+        "✅ <b>Промокод активирован!</b>\n\n"
+        "Ты получил:\n"
+        "💰 500 монет\n"
+        "👑 VIP на 7 дней\n"
+        "🛠 Элитный бур (5 уровень)\n\n"
+        "Возвращайся в главное меню!",
+        parse_mode=ParseMode.HTML
+    )
+    await callback.answer()
+
 # ===================== ПОМОЩЬ =====================
 @dp.message(F.text == "❓ Помощь")
 async def help_cmd(message: types.Message):
