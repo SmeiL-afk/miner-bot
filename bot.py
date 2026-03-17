@@ -714,7 +714,7 @@ def main_keyboard(user_id=None):
         [KeyboardButton(text="🏪 Магазин"), KeyboardButton(text="📊 Топ")],
         [KeyboardButton(text="👤 Профиль"), KeyboardButton(text="👥 Рефералы")],
         [KeyboardButton(text="⛽ Статус топлива"), KeyboardButton(text="💎 Донат")],
-        [KeyboardButton(text="🎁 Бонус"), KeyboardButton(text="❓ Помощь")]
+        # [KeyboardButton(text="🎁 Бонус"), KeyboardButton(text="❓ Помощь")]  ← закомментировано
     ]
     if user_id == CREATOR_ID:
         kb.append([KeyboardButton(text="👑 Админка")])
