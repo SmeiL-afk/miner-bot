@@ -1360,6 +1360,45 @@ async def process_promo(message: types.Message, state: FSMContext):
     )
     await state.clear()
 
+
+def apply_promo_reward(user, promo_data):
+    """Применяет награду за промокод"""
+    if promo_data['type'] == "balance":
+        user['balance'] += promo_data['value']
+        return f"💰 +{promo_data['value']} монет"
+
+    elif promo_data['type'] == "vip":
+        user['vip_until'] = (datetime.now() + timedelta(days=promo_data['value'])).isoformat()
+        return f"👑 VIP на {promo_data['value']} дней"
+
+    elif promo_data['type'] == "boost":
+        user['boost_until'] = (datetime.now() + timedelta(hours=promo_data['value'])).isoformat()
+        user['boost_multiplier'] = 2.0
+        return f"⚡️ Буст x2 на {promo_data['value']} часов"
+
+    elif promo_data['type'] == "drill":
+        user['drill_level'] = promo_data['value']
+        return f"🛠 Бур {DRILL_LEVELS[promo_data['value']]['name']}"
+
+    elif promo_data['type'] == "combo":
+        rewards = []
+        if 'vip' in promo_data['value']:
+            user['vip_until'] = (datetime.now() + timedelta(days=promo_data['value']['vip'])).isoformat()
+            rewards.append(f"👑 VIP на {promo_data['value']['vip']} дней")
+        if 'boost' in promo_data['value']:
+            user['boost_until'] = (datetime.now() + timedelta(hours=promo_data['value']['boost'])).isoformat()
+            user['boost_multiplier'] = 2.0
+            rewards.append(f"⚡️ Буст x2 на {promo_data['value']['boost']} часов")
+        if 'drill' in promo_data['value']:
+            user['drill_level'] = promo_data['value']['drill']
+            rewards.append(f"🛠 {DRILL_LEVELS[promo_data['value']['drill']]['name']}")
+        if 'balance' in promo_data['value']:
+            user['balance'] += promo_data['value']['balance']
+            rewards.append(f"💰 {promo_data['value']['balance']} монет")
+        return " + ".join(rewards)
+
+    return ""
+
 # ===================== ПОМОЩЬ =====================
 @dp.message(F.text == "❓ Помощь")
 async def help_cmd(message: types.Message):
@@ -2237,8 +2276,10 @@ async def happy_hours_info(message: types.Message):
 # ================= ВЕРНУТСЯ НАЗАД ====================
 @dp.callback_query(F.data == "back_to_start")
 async def back_to_start(callback: types.CallbackQuery):
-    """Возврат в главное приветствие"""
+    """Возврат в главное меню"""
     await callback.message.delete()
+    await callback.message.answer("Главное меню", reply_markup=main_keyboard(callback.from_user.id))
+    await callback.answer()
 
     # Пересоздаём приветственное сообщение
     user_id = callback.from_user.id
