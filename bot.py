@@ -2049,6 +2049,12 @@ async def back_to_shop(callback: types.CallbackQuery):
                                      parse_mode=ParseMode.HTML)
     await callback.answer()
 
+@dp.callback_query(F.data == "close")
+async def close_message(callback: types.CallbackQuery):
+    """Закрывает сообщение с топом"""
+    await callback.message.delete()
+    await callback.answer()
+
 # ===================== ЗАПУСК =====================
 async def main():
     print("🚀 Бот запускается...")
