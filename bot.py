@@ -1186,6 +1186,8 @@ async def copy_ref(callback: types.CallbackQuery):
 async def daily_bonus(message: types.Message):
     user_id = message.from_user.id
     user = await get_user(user_id)
+    print(f"🔍 last_daily в базе: {user.get('last_daily')}")
+    print(f"🔍 daily_streak: {user.get('daily_streak')}")
     today = datetime.now().date()
 
     # Получаем дату последнего бонуса
