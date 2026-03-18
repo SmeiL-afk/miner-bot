@@ -522,6 +522,7 @@ class AdminNotifier:
         await self.send_to_admin(text, kb)
 
     async def happy_hours_start(self):
+        """Уведомление о начале счастливых часов"""
         text = (
             "🎁 <b>СЧАСТЛИВЫЕ ЧАСЫ НАЧАЛИСЬ!</b>\n\n"
             "⏰ С 12:00 до 14:00 действует <b>УДВОЕННАЯ ДОБЫЧА</b>!\n"
@@ -529,7 +530,12 @@ class AdminNotifier:
             "🔥 Успей воспользоваться!"
         )
         users = await get_all_users()
-        await self.broadcast([u['user_id'] for u in users], text)
+        for u in users:
+            try:
+                await self.bot.send_message(u['user_id'], text, parse_mode=ParseMode.HTML)
+                await asyncio.sleep(0.05)
+            except:
+                pass
 
 
 # Инициализация нотификатора
@@ -2351,6 +2357,23 @@ async def back_to_start(callback: types.CallbackQuery):
 
     await send_photo(callback.message, welcome_text, "welcome.jpg", kb)
     await callback.answer()
+
+# ================= ПЛАНИРОВЩИК ИНВЕНТА ==================
+async def happy_hours_scheduler():
+    """Планировщик счастливых часов"""
+    while True:
+        now = datetime.now()
+
+        # Проверяем каждую минуту
+        if now.hour == 11 and now.minute == 55:  # За 5 минут до начала
+            await asyncio.sleep(5 * 60)  # Ждём до 12:00
+
+            # Отправляем уведомление
+            if hasattr(bot, 'notifier'):
+                await bot.notifier.happy_hours_start()
+                print("🎁 Уведомление о счастливых часах отправлено!")
+
+        await asyncio.sleep(60)
 
 # ===================== ЗАПУСК =====================
 async def main():
