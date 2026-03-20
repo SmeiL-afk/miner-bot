@@ -2254,7 +2254,7 @@ async def view_drill_test(callback: types.CallbackQuery):
 
 @dp.callback_query(F.data.startswith("view_drill_"))
 async def view_drill(callback: types.CallbackQuery):
-    """Показывает подробную информацию о буре с фото"""
+    """Показывает подробную информацию о буре с фото и кнопкой покупки"""
     level = int(callback.data.split("_")[2])
     user_id = callback.from_user.id
     user = await get_user(user_id)
