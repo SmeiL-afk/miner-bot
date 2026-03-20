@@ -2168,38 +2168,32 @@ async def shop_drills_callback(callback: types.CallbackQuery):
     await callback.answer()
 
 @dp.callback_query(F.data == "drills_cat_common")
-async def drills_cat_common(callback: types.CallbackQuery, state: FSMContext):
-    """Обычные буры (1-2 ур.)"""
-    await show_drill_list(callback, "common", state)
+async def drills_cat_common(callback: types.CallbackQuery):
+    await show_drill_list(callback, "common")
 
 @dp.callback_query(F.data == "drills_cat_uncommon")
-async def drills_cat_uncommon(callback: types.CallbackQuery, state: FSMContext):
-    """Необычные буры (3-4 ур.)"""
-    await show_drill_list(callback, "uncommon", state)
+async def drills_cat_uncommon(callback: types.CallbackQuery):
+    await show_drill_list(callback, "uncommon")
 
 @dp.callback_query(F.data == "drills_cat_rare")
-async def drills_cat_rare(callback: types.CallbackQuery, state: FSMContext):
-    """Редкие буры (5-7 ур.)"""
-    await show_drill_list(callback, "rare", state)
+async def drills_cat_rare(callback: types.CallbackQuery):
+    await show_drill_list(callback, "rare")
 
 @dp.callback_query(F.data == "drills_cat_epic")
-async def drills_cat_epic(callback: types.CallbackQuery, state: FSMContext):
-    """Эпические буры (8-12 ур.)"""
-    await show_drill_list(callback, "epic", state)
+async def drills_cat_epic(callback: types.CallbackQuery):
+    await show_drill_list(callback, "epic")
 
 @dp.callback_query(F.data == "drills_cat_legendary")
-async def drills_cat_legendary(callback: types.CallbackQuery, state: FSMContext):
-    """Легендарные буры (13-15 ур.)"""
-    await show_drill_list(callback, "legendary", state)
+async def drills_cat_legendary(callback: types.CallbackQuery):
+    await show_drill_list(callback, "legendary")
 
 @dp.callback_query(F.data == "drills_cat_mythic")
-async def drills_cat_mythic(callback: types.CallbackQuery, state: FSMContext):
-    """Мифические буры (16-18 ур.)"""
-    await show_drill_list(callback, "mythic", state)
+async def drills_cat_mythic(callback: types.CallbackQuery):
+    await show_drill_list(callback, "mythic")
 
 
-async def show_drill_list(callback: types.CallbackQuery, category: str, state: FSMContext):
-    """Показывает список буров в категории с кнопками (редактирует текущее сообщение)"""
+async def show_drill_list(callback: types.CallbackQuery, category: str):
+    """Показывает список буров в категории с кликабельными кнопками"""
     categories = {
         "common": {"name": "🟢 Обычные", "levels": [1, 2]},
         "uncommon": {"name": "🔵 Необычные", "levels": [3, 4]},
@@ -2220,29 +2214,31 @@ async def show_drill_list(callback: types.CallbackQuery, category: str, state: F
     for level in categories[category]["levels"]:
         drill = DRILL_LEVELS[level]
 
+        # Формируем текст кнопки
         if level > user['drill_level']:
             if drill.get('price_coins', 0) > 0:
-                btn_text = f"🛠 {drill['name']} — {drill['price_coins']}💰"
+                btn_text = f"💰 {drill['name']} — {drill['price_coins']}💰"
+            elif drill.get('loc', ''):
+                btn_text = f"🗺️ {drill['name']} — {drill['loc']}"
             else:
-                btn_text = f"🗺️ {drill['name']} — {drill.get('loc', 'особое место')}"
+                btn_text = f"✨ {drill['name']} — ивент"
         elif level == user['drill_level']:
             btn_text = f"✅ {drill['name']} (твой)"
         else:
-            btn_text = f"✅ {drill['name']}"
+            btn_text = f"✅ {drill['name']} (куплен)"
 
         kb.append([InlineKeyboardButton(text=btn_text, callback_data=f"view_drill_{level}")])
 
     kb.append([InlineKeyboardButton(text="◀️ Назад", callback_data="shop_drills")])
 
-    # Редактируем текущее сообщение
     await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
                                      parse_mode=ParseMode.HTML)
     await callback.answer()
 
 
 @dp.callback_query(F.data.startswith("view_drill_"))
-async def view_drill(callback: types.CallbackQuery, state: FSMContext):
-    """Показывает подробную информацию о буре с фото (редактирует сообщение)"""
+async def view_drill(callback: types.CallbackQuery):
+    """Показывает подробную информацию о буре с фото и кнопками"""
     level = int(callback.data.split("_")[2])
     user_id = callback.from_user.id
     user = await get_user(user_id)
@@ -2259,18 +2255,21 @@ async def view_drill(callback: types.CallbackQuery, state: FSMContext):
             text += f"💰 <b>Цена:</b> {drill['price_coins']} монет"
         elif drill.get('price_rub', 0) > 0:
             text += f"💎 <b>Цена:</b> {drill['price_rub']}₽"
+        elif drill.get('loc', ''):
+            text += f"🗺️ <b>Можно найти в:</b> {drill['loc']}"
         else:
-            text += f"🗺️ <b>Можно найти в:</b> {drill.get('loc', 'особых местах')}"
+            text += f"🎁 <b>Получить:</b> в особых ивентах"
     else:
         text += f"✅ <b>Уже куплен</b>"
 
     # Кнопки
     kb = []
 
+    # Кнопка покупки (только если есть цена)
     if level > user['drill_level'] and drill.get('price_coins', 0) > 0:
         kb.append([InlineKeyboardButton(text="💰 Купить", callback_data=f"buy_drill_{level}")])
 
-    # Определяем категорию для возврата
+    # Кнопка назад в категорию
     if level in [1, 2]:
         back_cat = "common"
     elif level in [3, 4]:
@@ -2288,18 +2287,23 @@ async def view_drill(callback: types.CallbackQuery, state: FSMContext):
 
     # Фото
     image_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "images", f"drill_{level}.jpg")
-    if os.path.exists(image_path):
-        photo = FSInputFile(image_path)
-        # Редактируем с фото (удаляем старое и отправляем новое с фото)
-        await callback.message.delete()
-        await callback.message.answer_photo(
-            photo=photo,
-            caption=text,
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
-            parse_mode=ParseMode.HTML
-        )
-    else:
-        # Редактируем текст
+
+    try:
+        if os.path.exists(image_path):
+            photo = FSInputFile(image_path)
+            await callback.message.delete()
+            await callback.message.answer_photo(
+                photo=photo,
+                caption=text,
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
+                parse_mode=ParseMode.HTML
+            )
+        else:
+            # Если фото нет — просто текст
+            await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
+                                             parse_mode=ParseMode.HTML)
+    except Exception as e:
+        print(f"Ошибка при показе бура: {e}")
         await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
                                          parse_mode=ParseMode.HTML)
 
