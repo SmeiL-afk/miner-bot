@@ -2199,6 +2199,158 @@ async def drills_cat_mythic(callback: types.CallbackQuery, state: FSMContext):
 
 
 async def show_drill_list(callback: types.CallbackQuery, category: str, state: FSMContext):
+    """Показывает список буров в категории с кнопками (редактирует текущее сообщение)"""
+    categories = {
+        "common": {"name": "🟢 Обычные", "levels": [1, 2]},
+        "uncommon": {"name": "🔵 Необычные", "levels": [3, 4]},
+        "rare": {"name": "🟣 Редкие", "levels": [5, 6, 7]},
+        "epic": {"name": "🟡 Эпические", "levels": [8, 9, 10, 11, 12]},
+        "legendary": {"name": "🟤 Легендарные", "levels": [13, 14, 15]},
+        "mythic": {"name": "👑 Мифические", "levels": [16, 17, 18]}
+    }
+
+    user_id = callback.from_user.id
+    user = await get_user(user_id)
+
+    text = f"<b>{categories[category]['name']}</b>\n\n"
+    text += "👇 Нажми на бур, чтобы посмотреть подробнее:\n\n"
+
+    kb = []
+
+    for level in categories[category]["levels"]:
+        drill = DRILL_LEVELS[level]
+
+        if level > user['drill_level']:
+            if drill.get('price_coins', 0) > 0:
+                btn_text = f"🛠 {drill['name']} — {drill['price_coins']}💰"
+            else:
+                btn_text = f"🗺️ {drill['name']} — {drill.get('loc', 'особое место')}"
+        elif level == user['drill_level']:
+            btn_text = f"✅ {drill['name']} (твой)"
+        else:
+            btn_text = f"✅ {drill['name']}"
+
+        kb.append([InlineKeyboardButton(text=btn_text, callback_data=f"view_drill_{level}")])
+
+    kb.append([InlineKeyboardButton(text="◀️ Назад", callback_data="shop_drills")])
+
+    # Редактируем текущее сообщение
+    await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
+                                     parse_mode=ParseMode.HTML)
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("view_drill_"))
+async def view_drill(callback: types.CallbackQuery, state: FSMContext):
+    """Показывает подробную информацию о буре с фото (редактирует сообщение)"""
+    level = int(callback.data.split("_")[2])
+    user_id = callback.from_user.id
+    user = await get_user(user_id)
+    drill = DRILL_LEVELS[level]
+
+    # Формируем текст
+    text = f"✨ <b>{drill['name']}</b>\n\n"
+    text += f"🎁 <b>Редкость:</b> {drill['rarity']}\n"
+    text += f"⚡️ <b>Бонус:</b> +{drill['bonus']}% к добыче\n"
+    text += f"📝 <b>Описание:</b> {drill['desc']}\n\n"
+
+    if level > user['drill_level']:
+        if drill.get('price_coins', 0) > 0:
+            text += f"💰 <b>Цена:</b> {drill['price_coins']} монет"
+        elif drill.get('price_rub', 0) > 0:
+            text += f"💎 <b>Цена:</b> {drill['price_rub']}₽"
+        else:
+            text += f"🗺️ <b>Можно найти в:</b> {drill.get('loc', 'особых местах')}"
+    else:
+        text += f"✅ <b>Уже куплен</b>"
+
+    # Кнопки
+    kb = []
+
+    if level > user['drill_level'] and drill.get('price_coins', 0) > 0:
+        kb.append([InlineKeyboardButton(text="💰 Купить", callback_data=f"buy_drill_{level}")])
+
+    # Определяем категорию для возврата
+    if level in [1, 2]:
+        back_cat = "common"
+    elif level in [3, 4]:
+        back_cat = "uncommon"
+    elif level in [5, 6, 7]:
+        back_cat = "rare"
+    elif level in [8, 9, 10, 11, 12]:
+        back_cat = "epic"
+    elif level in [13, 14, 15]:
+        back_cat = "legendary"
+    else:
+        back_cat = "mythic"
+
+    kb.append([InlineKeyboardButton(text="◀️ Назад к списку", callback_data=f"back_to_category_{back_cat}")])
+
+    # Фото
+    image_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "images", f"drill_{level}.jpg")
+    if os.path.exists(image_path):
+        photo = FSInputFile(image_path)
+        # Редактируем с фото (удаляем старое и отправляем новое с фото)
+        await callback.message.delete()
+        await callback.message.answer_photo(
+            photo=photo,
+            caption=text,
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
+            parse_mode=ParseMode.HTML
+        )
+    else:
+        # Редактируем текст
+        await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
+                                         parse_mode=ParseMode.HTML)
+
+    await callback.answer()
+
+
+@dp.callback_query(F.data.startswith("back_to_category_"))
+async def back_to_drill_category(callback: types.CallbackQuery, state: FSMContext):
+    """Возврат в категорию после просмотра бура (редактирует сообщение)"""
+    category = callback.data.replace("back_to_category_", "")
+
+    categories = {
+        "common": {"name": "🟢 Обычные", "levels": [1, 2]},
+        "uncommon": {"name": "🔵 Необычные", "levels": [3, 4]},
+        "rare": {"name": "🟣 Редкие", "levels": [5, 6, 7]},
+        "epic": {"name": "🟡 Эпические", "levels": [8, 9, 10, 11, 12]},
+        "legendary": {"name": "🟤 Легендарные", "levels": [13, 14, 15]},
+        "mythic": {"name": "👑 Мифические", "levels": [16, 17, 18]}
+    }
+
+    user_id = callback.from_user.id
+    user = await get_user(user_id)
+
+    text = f"<b>{categories[category]['name']}</b>\n\n"
+    text += "👇 Нажми на бур, чтобы посмотреть подробнее:\n\n"
+
+    kb = []
+
+    for level in categories[category]["levels"]:
+        drill = DRILL_LEVELS[level]
+
+        if level > user['drill_level']:
+            if drill.get('price_coins', 0) > 0:
+                btn_text = f"🛠 {drill['name']} — {drill['price_coins']}💰"
+            else:
+                btn_text = f"🗺️ {drill['name']} — {drill.get('loc', 'особое место')}"
+        elif level == user['drill_level']:
+            btn_text = f"✅ {drill['name']} (твой)"
+        else:
+            btn_text = f"✅ {drill['name']}"
+
+        kb.append([InlineKeyboardButton(text=btn_text, callback_data=f"view_drill_{level}")])
+
+    kb.append([InlineKeyboardButton(text="◀️ Назад", callback_data="shop_drills")])
+
+    # Редактируем сообщение
+    await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
+                                     parse_mode=ParseMode.HTML)
+    await callback.answer()
+
+async def show_drill_list(callback: types.CallbackQuery, category: str, state: FSMContext):
     """Показывает список буров в категории"""
     categories = {
         "common": {"name": "🟢 Обычные", "levels": [1, 2]},
