@@ -2169,26 +2169,32 @@ async def shop_drills_callback(callback: types.CallbackQuery):
 
 @dp.callback_query(F.data == "drills_cat_common")
 async def drills_cat_common(callback: types.CallbackQuery):
+    print("🔍 Выбрана категория: Обычные")  # отладка
     await show_drill_list(callback, "common")
 
 @dp.callback_query(F.data == "drills_cat_uncommon")
 async def drills_cat_uncommon(callback: types.CallbackQuery):
+    print("🔍 Выбрана категория: Необычные")
     await show_drill_list(callback, "uncommon")
 
 @dp.callback_query(F.data == "drills_cat_rare")
 async def drills_cat_rare(callback: types.CallbackQuery):
+    print("🔍 Выбрана категория: Редкие")
     await show_drill_list(callback, "rare")
 
 @dp.callback_query(F.data == "drills_cat_epic")
 async def drills_cat_epic(callback: types.CallbackQuery):
+    print("🔍 Выбрана категория: Эпические")
     await show_drill_list(callback, "epic")
 
 @dp.callback_query(F.data == "drills_cat_legendary")
 async def drills_cat_legendary(callback: types.CallbackQuery):
+    print("🔍 Выбрана категория: Легендарные")
     await show_drill_list(callback, "legendary")
 
 @dp.callback_query(F.data == "drills_cat_mythic")
 async def drills_cat_mythic(callback: types.CallbackQuery):
+    print("🔍 Выбрана категория: Мифические")
     await show_drill_list(callback, "mythic")
 
 
