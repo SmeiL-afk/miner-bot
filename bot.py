@@ -4,6 +4,7 @@ import random
 import json
 import aiomysql
 import pytz
+import traceback
 from datetime import datetime, timedelta
 from typing import Optional, List
 from aiogram import Bot, Dispatcher, types, F
@@ -2368,54 +2369,36 @@ async def back_to_drill_category(callback: types.CallbackQuery, state: FSMContex
                                      parse_mode=ParseMode.HTML)
     await callback.answer()
 
-async def show_drill_list(callback: types.CallbackQuery, category: str, state: FSMContext):
-    """Показывает список буров в категории"""
-    categories = {
-        "common": {"name": "🟢 Обычные", "levels": [1, 2]},
-        "uncommon": {"name": "🔵 Необычные", "levels": [3, 4]},
-        "rare": {"name": "🟣 Редкие", "levels": [5, 6, 7]},
-        "epic": {"name": "🟡 Эпические", "levels": [8, 9, 10, 11, 12]},
-        "legendary": {"name": "🟤 Легендарные", "levels": [13, 14, 15]},
-        "mythic": {"name": "👑 Мифические", "levels": [16, 17, 18]}
-    }
 
-    user_id = callback.from_user.id
-    user = await get_user(user_id)
+async def show_drill_list(callback: types.CallbackQuery, category: str):
+    """Максимально простой вариант"""
+    try:
+        print(f"📋 show_drill_list вызвана для {category}")
 
-    text = f"<b>{categories[category]['name']}</b>\n\n"
-    kb = []
+        # Простейший текст
+        text = f"Категория: {category}\n\nЭто тестовое сообщение"
 
-    for level in categories[category]["levels"]:
-        drill = DRILL_LEVELS[level]
+        # Простейшая клавиатура
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="Назад", callback_data="shop_drills")]
+        ])
 
-        if level > user['drill_level']:
-            # Бур можно купить
-            if drill.get('price_coins', 0) > 0:
-                btn_text = f"{drill['name']} — {drill['price_coins']}💰"
-                kb.append([InlineKeyboardButton(text=btn_text, callback_data=f"buy_drill_{level}")])
-                text += f"• <b>{drill['name']}</b>\n"
-                text += f"  ⚡️ +{drill['bonus']}%\n"
-                text += f"  💰 {drill['price_coins']} монет\n\n"
-            else:
-                text += f"• <b>{drill['name']}</b>\n"
-                text += f"  ⚡️ +{drill['bonus']}%\n"
-                text += f"  🗺️ {drill.get('loc', 'особое место')}\n\n"
-        elif level == user['drill_level']:
-            # Текущий бур
-            text += f"• <b>{drill['name']}</b> ✅ (твой)\n"
-            text += f"  ⚡️ +{drill['bonus']}%\n\n"
-        else:
-            # Бур уже куплен (но не текущий)
-            text += f"• <b>{drill['name']}</b> ✅\n"
-            text += f"  ⚡️ +{drill['bonus']}%\n\n"
+        # Пробуем отредактировать
+        await callback.message.edit_text(text, reply_markup=kb)
+        print("✅ Сообщение обновлено")
 
-    if not kb and category not in ["epic", "legendary", "mythic"]:
-        text += "😕 В этой категории пока нет доступных буров"
+    except Exception as e:
+        print(f"❌ Ошибка в show_drill_list: {e}")
+        traceback.print_exc()
 
-    kb.append([InlineKeyboardButton(text="◀️ Назад", callback_data="shop_drills")])
+        # Если редактирование не удалось — удаляем и создаём новое
+        try:
+            await callback.message.delete()
+            await callback.message.answer(text, reply_markup=kb)
+            print("✅ Создано новое сообщение")
+        except:
+            print("❌ Полный провал")
 
-    await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
-                                     parse_mode=ParseMode.HTML)
     await callback.answer()
 
 @dp.callback_query(F.data.startswith("drills_cat_"))
