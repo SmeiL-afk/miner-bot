@@ -2199,7 +2199,7 @@ async def drills_cat_mythic(callback: types.CallbackQuery):
 
 
 async def show_drill_list(callback: types.CallbackQuery, category: str):
-    """Показывает список буров в категории с кликабельными кнопками"""
+    """Показывает список буров в категории"""
     categories = {
         "common": {"name": "🟢 Обычные", "levels": [1, 2]},
         "uncommon": {"name": "🔵 Необычные", "levels": [3, 4]},
@@ -2212,35 +2212,43 @@ async def show_drill_list(callback: types.CallbackQuery, category: str):
     user_id = callback.from_user.id
     user = await get_user(user_id)
 
-    text = f"<b>{categories[category]['name']}</b>\n\n"
-    text += "👇 Нажми на бур, чтобы посмотреть подробнее:\n\n"
+    print(f"📋 Показываем категорию: {categories[category]['name']}")  # отладка
 
+    text = f"<b>{categories[category]['name']}</b>\n\n"
     kb = []
 
     for level in categories[category]["levels"]:
         drill = DRILL_LEVELS[level]
 
-        # Формируем текст кнопки
-        if level > user['drill_level']:
-            if drill.get('price_coins', 0) > 0:
-                btn_text = f"💰 {drill['name']} — {drill['price_coins']}💰"
-            elif drill.get('loc', ''):
-                btn_text = f"🗺️ {drill['name']} — {drill['loc']}"
-            else:
-                btn_text = f"✨ {drill['name']} — ивент"
-        elif level == user['drill_level']:
-            btn_text = f"✅ {drill['name']} (твой)"
-        else:
-            btn_text = f"✅ {drill['name']} (куплен)"
-
+        # Простая кнопка для проверки
+        btn_text = f"{drill['name']}"
         kb.append([InlineKeyboardButton(text=btn_text, callback_data=f"view_drill_{level}")])
+
+        text += f"• {drill['name']} — +{drill['bonus']}%\n"
 
     kb.append([InlineKeyboardButton(text="◀️ Назад", callback_data="shop_drills")])
 
-    await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
-                                     parse_mode=ParseMode.HTML)
+    try:
+        await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
+                                         parse_mode=ParseMode.HTML)
+        print("✅ Сообщение обновлено")
+    except Exception as e:
+        print(f"❌ Ошибка: {e}")
+        # Если не получилось отредактировать — удаляем и создаём новое
+        await callback.message.delete()
+        await callback.message.answer(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
+                                      parse_mode=ParseMode.HTML)
+
     await callback.answer()
 
+
+@dp.callback_query(F.data.startswith("view_drill_"))
+async def view_drill_test(callback: types.CallbackQuery):
+    """Тестовая функция для проверки"""
+    level = int(callback.data.split("_")[2])
+    drill = DRILL_LEVELS[level]
+
+    await callback.answer(f"Выбран бур: {drill['name']}", show_alert=True)
 
 @dp.callback_query(F.data.startswith("view_drill_"))
 async def view_drill(callback: types.CallbackQuery):
