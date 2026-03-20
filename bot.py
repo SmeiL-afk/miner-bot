@@ -2469,6 +2469,23 @@ async def show_drill_list(callback: types.CallbackQuery, category: str):
                                      parse_mode=ParseMode.HTML)
     await callback.answer()
 
+    kb.append([InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_drills_list")])
+
+@dp.callback_query(F.data == "back_to_drills_list")
+async def back_to_drills_list(callback: types.CallbackQuery):
+    """Возврат в список буров текущей категории"""
+    await callback.message.delete()
+    await callback.message.answer("🛠 Выбери категорию:", reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="🟢 Обычные", callback_data="drills_cat_common")],
+        [InlineKeyboardButton(text="🔵 Необычные", callback_data="drills_cat_uncommon")],
+        [InlineKeyboardButton(text="🟣 Редкие", callback_data="drills_cat_rare")],
+        [InlineKeyboardButton(text="🟡 Эпические", callback_data="drills_cat_epic")],
+        [InlineKeyboardButton(text="🟤 Легендарные", callback_data="drills_cat_legendary")],
+        [InlineKeyboardButton(text="👑 Мифические", callback_data="drills_cat_mythic")],
+        [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_shop")]
+    ]))
+    await callback.answer()
+
 @dp.callback_query(F.data.startswith("drills_cat_"))
 async def show_drill_category(callback: types.CallbackQuery, state: FSMContext):
     """Показывает первый бур в категории"""
