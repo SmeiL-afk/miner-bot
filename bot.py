@@ -2379,8 +2379,8 @@ async def view_drill(callback: types.CallbackQuery):
 
 
 @dp.callback_query(F.data.startswith("back_to_category_"))
-async def back_to_drill_category(callback: types.CallbackQuery, state: FSMContext):
-    """Возврат в категорию после просмотра бура (редактирует сообщение)"""
+async def back_to_category(callback: types.CallbackQuery):
+    """Возврат в категорию после просмотра бура"""
     category = callback.data.replace("back_to_category_", "")
 
     categories = {
@@ -2396,7 +2396,7 @@ async def back_to_drill_category(callback: types.CallbackQuery, state: FSMContex
     user = await get_user(user_id)
 
     text = f"<b>{categories[category]['name']}</b>\n\n"
-    text += "👇 Нажми на бур, чтобы посмотреть подробнее:\n\n"
+    text += "👇 Нажми на бур для подробностей:\n\n"
 
     kb = []
 
@@ -2405,9 +2405,13 @@ async def back_to_drill_category(callback: types.CallbackQuery, state: FSMContex
 
         if level > user['drill_level']:
             if drill.get('price_coins', 0) > 0:
-                btn_text = f"🛠 {drill['name']} — {drill['price_coins']}💰"
+                btn_text = f"💰 {drill['name']} — {drill['price_coins']}💰"
+            elif drill.get('price_rub', 0) > 0:
+                btn_text = f"💎 {drill['name']} — {drill['price_rub']}₽"
+            elif drill.get('loc', ''):
+                btn_text = f"🗺️ {drill['name']} — {drill['loc']}"
             else:
-                btn_text = f"🗺️ {drill['name']} — {drill.get('loc', 'особое место')}"
+                btn_text = f"✨ {drill['name']}"
         elif level == user['drill_level']:
             btn_text = f"✅ {drill['name']} (твой)"
         else:
@@ -2417,16 +2421,8 @@ async def back_to_drill_category(callback: types.CallbackQuery, state: FSMContex
 
     kb.append([InlineKeyboardButton(text="◀️ Назад", callback_data="shop_drills")])
 
-    # Редактируем сообщение
     await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
                                      parse_mode=ParseMode.HTML)
-    await callback.answer()
-
-@dp.callback_query(F.data.startswith("back_to_category_"))
-async def back_to_drill_category(callback: types.CallbackQuery):
-    """Возврат в категорию после просмотра бура"""
-    category = callback.data.replace("back_to_category_", "")
-    await show_drill_list(callback, category)
     await callback.answer()
 
 async def show_drill_list(callback: types.CallbackQuery, category: str):
