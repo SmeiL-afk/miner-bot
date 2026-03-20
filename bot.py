@@ -2633,11 +2633,11 @@ async def buy_drill(callback: types.CallbackQuery):
 
 
 @dp.callback_query(F.data.startswith("back_to_category_"))
-async def back_to_category(callback: types.CallbackQuery, state: FSMContext):
-    """Возврат в категорию после покупки"""
-    level = int(callback.data.split("_")[3])
-    user_id = callback.from_user.id
-    user = await get_user(user_id)
+async def back_to_category(callback: types.CallbackQuery):
+    """Возврат в категорию после просмотра"""
+    category = callback.data.replace("back_to_category_", "")
+    await show_drill_list(callback, category)
+    await callback.answer()
 
     # Определяем категорию по уровню
     if level in [1, 2]:
