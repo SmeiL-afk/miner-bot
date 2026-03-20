@@ -2309,6 +2309,9 @@ async def view_drill(callback: types.CallbackQuery):
     user_id = callback.from_user.id
     user = await get_user(user_id)
     drill = DRILL_LEVELS[level]
+    image_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "images", f"drill_{level}.jpg")
+    print(f"🔍 Ищу фото: {image_path}")
+    print(f"📁 Файл существует: {os.path.exists(image_path)}")
 
     # Формируем текст
     text = f"✨ <b>{drill['name']}</b>\n\n"
