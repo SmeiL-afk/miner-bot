@@ -2149,14 +2149,14 @@ async def buy_drill(callback: types.CallbackQuery):
 # ===================== МАГАЗИН - ВСЕ КНОПКИ =====================
 @dp.callback_query(F.data == "shop_drills")
 async def shop_drills_callback(callback: types.CallbackQuery):
-    """Магазин буров с категориями и фото"""
+    """Магазин буров с категориями"""
     kb = InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text="🟢 Обычные (1-2 ур.)", callback_data="drills_cat_common")],
-        [InlineKeyboardButton(text="🔵 Необычные (3-4 ур.)", callback_data="drills_cat_uncommon")],
-        [InlineKeyboardButton(text="🟣 Редкие (5-7 ур.)", callback_data="drills_cat_rare")],
-        [InlineKeyboardButton(text="🟡 Эпические (8-12 ур.)", callback_data="drills_cat_epic")],
-        [InlineKeyboardButton(text="🟤 Легендарные (13-15 ур.)", callback_data="drills_cat_legendary")],
-        [InlineKeyboardButton(text="👑 Мифические (16-18 ур.)", callback_data="drills_cat_mythic")],
+        [InlineKeyboardButton(text="🟢 Обычные", callback_data="drills_cat_common")],
+        [InlineKeyboardButton(text="🔵 Необычные", callback_data="drills_cat_uncommon")],
+        [InlineKeyboardButton(text="🟣 Редкие", callback_data="drills_cat_rare")],
+        [InlineKeyboardButton(text="🟡 Эпические", callback_data="drills_cat_epic")],
+        [InlineKeyboardButton(text="🟤 Легендарные", callback_data="drills_cat_legendary")],
+        [InlineKeyboardButton(text="👑 Мифические", callback_data="drills_cat_mythic")],
         [InlineKeyboardButton(text="◀️ Назад", callback_data="back_to_shop")]
     ])
 
@@ -2167,6 +2167,86 @@ async def shop_drills_callback(callback: types.CallbackQuery):
     )
     await callback.answer()
 
+@dp.callback_query(F.data == "drills_cat_common")
+async def drills_cat_common(callback: types.CallbackQuery, state: FSMContext):
+    """Обычные буры (1-2 ур.)"""
+    await show_drill_list(callback, "common", state)
+
+@dp.callback_query(F.data == "drills_cat_uncommon")
+async def drills_cat_uncommon(callback: types.CallbackQuery, state: FSMContext):
+    """Необычные буры (3-4 ур.)"""
+    await show_drill_list(callback, "uncommon", state)
+
+@dp.callback_query(F.data == "drills_cat_rare")
+async def drills_cat_rare(callback: types.CallbackQuery, state: FSMContext):
+    """Редкие буры (5-7 ур.)"""
+    await show_drill_list(callback, "rare", state)
+
+@dp.callback_query(F.data == "drills_cat_epic")
+async def drills_cat_epic(callback: types.CallbackQuery, state: FSMContext):
+    """Эпические буры (8-12 ур.)"""
+    await show_drill_list(callback, "epic", state)
+
+@dp.callback_query(F.data == "drills_cat_legendary")
+async def drills_cat_legendary(callback: types.CallbackQuery, state: FSMContext):
+    """Легендарные буры (13-15 ур.)"""
+    await show_drill_list(callback, "legendary", state)
+
+@dp.callback_query(F.data == "drills_cat_mythic")
+async def drills_cat_mythic(callback: types.CallbackQuery, state: FSMContext):
+    """Мифические буры (16-18 ур.)"""
+    await show_drill_list(callback, "mythic", state)
+
+
+async def show_drill_list(callback: types.CallbackQuery, category: str, state: FSMContext):
+    """Показывает список буров в категории"""
+    categories = {
+        "common": {"name": "🟢 Обычные", "levels": [1, 2]},
+        "uncommon": {"name": "🔵 Необычные", "levels": [3, 4]},
+        "rare": {"name": "🟣 Редкие", "levels": [5, 6, 7]},
+        "epic": {"name": "🟡 Эпические", "levels": [8, 9, 10, 11, 12]},
+        "legendary": {"name": "🟤 Легендарные", "levels": [13, 14, 15]},
+        "mythic": {"name": "👑 Мифические", "levels": [16, 17, 18]}
+    }
+
+    user_id = callback.from_user.id
+    user = await get_user(user_id)
+
+    text = f"<b>{categories[category]['name']}</b>\n\n"
+    kb = []
+
+    for level in categories[category]["levels"]:
+        drill = DRILL_LEVELS[level]
+
+        if level > user['drill_level']:
+            # Бур можно купить
+            if drill.get('price_coins', 0) > 0:
+                btn_text = f"{drill['name']} — {drill['price_coins']}💰"
+                kb.append([InlineKeyboardButton(text=btn_text, callback_data=f"buy_drill_{level}")])
+                text += f"• <b>{drill['name']}</b>\n"
+                text += f"  ⚡️ +{drill['bonus']}%\n"
+                text += f"  💰 {drill['price_coins']} монет\n\n"
+            else:
+                text += f"• <b>{drill['name']}</b>\n"
+                text += f"  ⚡️ +{drill['bonus']}%\n"
+                text += f"  🗺️ {drill.get('loc', 'особое место')}\n\n"
+        elif level == user['drill_level']:
+            # Текущий бур
+            text += f"• <b>{drill['name']}</b> ✅ (твой)\n"
+            text += f"  ⚡️ +{drill['bonus']}%\n\n"
+        else:
+            # Бур уже куплен (но не текущий)
+            text += f"• <b>{drill['name']}</b> ✅\n"
+            text += f"  ⚡️ +{drill['bonus']}%\n\n"
+
+    if not kb and category not in ["epic", "legendary", "mythic"]:
+        text += "😕 В этой категории пока нет доступных буров"
+
+    kb.append([InlineKeyboardButton(text="◀️ Назад", callback_data="shop_drills")])
+
+    await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
+                                     parse_mode=ParseMode.HTML)
+    await callback.answer()
 
 @dp.callback_query(F.data.startswith("drills_cat_"))
 async def show_drill_category(callback: types.CallbackQuery, state: FSMContext):
