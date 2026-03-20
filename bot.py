@@ -2251,9 +2251,10 @@ async def view_drill_test(callback: types.CallbackQuery):
 
     await callback.answer(f"Выбран бур: {drill['name']}", show_alert=True)
 
+
 @dp.callback_query(F.data.startswith("view_drill_"))
 async def view_drill(callback: types.CallbackQuery):
-    """Показывает подробную информацию о буре с фото и кнопками"""
+    """Показывает подробную информацию о буре с фото"""
     level = int(callback.data.split("_")[2])
     user_id = callback.from_user.id
     user = await get_user(user_id)
@@ -2280,7 +2281,7 @@ async def view_drill(callback: types.CallbackQuery):
     # Кнопки
     kb = []
 
-    # Кнопка покупки (только если есть цена)
+    # Кнопка покупки (только если есть цена и не куплен)
     if level > user['drill_level'] and drill.get('price_coins', 0) > 0:
         kb.append([InlineKeyboardButton(text="💰 Купить", callback_data=f"buy_drill_{level}")])
 
@@ -2314,11 +2315,10 @@ async def view_drill(callback: types.CallbackQuery):
                 parse_mode=ParseMode.HTML
             )
         else:
-            # Если фото нет — просто текст
             await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
                                              parse_mode=ParseMode.HTML)
     except Exception as e:
-        print(f"Ошибка при показе бура: {e}")
+        print(f"Ошибка: {e}")
         await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
                                          parse_mode=ParseMode.HTML)
 
@@ -2369,36 +2369,55 @@ async def back_to_drill_category(callback: types.CallbackQuery, state: FSMContex
                                      parse_mode=ParseMode.HTML)
     await callback.answer()
 
+@dp.callback_query(F.data.startswith("back_to_category_"))
+async def back_to_drill_category(callback: types.CallbackQuery):
+    """Возврат в категорию после просмотра бура"""
+    category = callback.data.replace("back_to_category_", "")
+    await show_drill_list(callback, category)
+    await callback.answer()
 
 async def show_drill_list(callback: types.CallbackQuery, category: str):
-    """Максимально простой вариант"""
-    try:
-        print(f"📋 show_drill_list вызвана для {category}")
+    """Показывает список буров в категории с кнопками"""
+    categories = {
+        "common": {"name": "🟢 Обычные", "levels": [1, 2]},
+        "uncommon": {"name": "🔵 Необычные", "levels": [3, 4]},
+        "rare": {"name": "🟣 Редкие", "levels": [5, 6, 7]},
+        "epic": {"name": "🟡 Эпические", "levels": [8, 9, 10, 11, 12]},
+        "legendary": {"name": "🟤 Легендарные", "levels": [13, 14, 15]},
+        "mythic": {"name": "👑 Мифические", "levels": [16, 17, 18]}
+    }
 
-        # Простейший текст
-        text = f"Категория: {category}\n\nЭто тестовое сообщение"
+    user_id = callback.from_user.id
+    user = await get_user(user_id)
 
-        # Простейшая клавиатура
-        kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="Назад", callback_data="shop_drills")]
-        ])
+    text = f"<b>{categories[category]['name']}</b>\n\n"
+    text += "👇 Нажми на бур для подробностей:\n\n"
 
-        # Пробуем отредактировать
-        await callback.message.edit_text(text, reply_markup=kb)
-        print("✅ Сообщение обновлено")
+    kb = []
 
-    except Exception as e:
-        print(f"❌ Ошибка в show_drill_list: {e}")
-        traceback.print_exc()
+    for level in categories[category]["levels"]:
+        drill = DRILL_LEVELS[level]
 
-        # Если редактирование не удалось — удаляем и создаём новое
-        try:
-            await callback.message.delete()
-            await callback.message.answer(text, reply_markup=kb)
-            print("✅ Создано новое сообщение")
-        except:
-            print("❌ Полный провал")
+        if level > user['drill_level']:
+            if drill.get('price_coins', 0) > 0:
+                btn_text = f"💰 {drill['name']} — {drill['price_coins']}💰"
+            elif drill.get('price_rub', 0) > 0:
+                btn_text = f"💎 {drill['name']} — {drill['price_rub']}₽"
+            elif drill.get('loc', ''):
+                btn_text = f"🗺️ {drill['name']} — {drill['loc']}"
+            else:
+                btn_text = f"✨ {drill['name']}"
+        elif level == user['drill_level']:
+            btn_text = f"✅ {drill['name']} (твой)"
+        else:
+            btn_text = f"✅ {drill['name']}"
 
+        kb.append([InlineKeyboardButton(text=btn_text, callback_data=f"view_drill_{level}")])
+
+    kb.append([InlineKeyboardButton(text="◀️ Назад", callback_data="shop_drills")])
+
+    await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
+                                     parse_mode=ParseMode.HTML)
     await callback.answer()
 
 @dp.callback_query(F.data.startswith("drills_cat_"))
@@ -2526,7 +2545,7 @@ async def drill_navigation(callback: types.CallbackQuery, state: FSMContext):
 
 @dp.callback_query(F.data.startswith("buy_drill_"))
 async def buy_drill(callback: types.CallbackQuery):
-    """Покупка бура с возвратом в категорию"""
+    """Покупка бура"""
     level = int(callback.data.split("_")[2])
     user_id = callback.from_user.id
     user = await get_user(user_id)
@@ -2545,17 +2564,18 @@ async def buy_drill(callback: types.CallbackQuery):
         user['drill_level'] = level
         await update_user(user_id, balance=user['balance'], drill_level=level)
 
-        # После покупки возвращаем в категорию
-        text = f"✅ <b>Поздравляем с покупкой!</b>\n\n"
-        text += f"🛠 <b>{drill['name']}</b> теперь твой!\n"
-        text += f"💰 Остаток: {user['balance']} монет\n\n"
-        text += f"⬅️ Нажми «Назад», чтобы продолжить покупки"
-
-        kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="◀️ Назад в категорию", callback_data=f"back_to_category_{drill['level']}")]
-        ])
-
-        await callback.message.edit_text(text, reply_markup=kb, parse_mode=ParseMode.HTML)
+        # После покупки показываем сообщение
+        await callback.message.edit_text(
+            f"✅ <b>Поздравляем с покупкой!</b>\n\n"
+            f"🛠 <b>{drill['name']}</b> теперь твой!\n"
+            f"⚡️ Бонус: +{drill['bonus']}%\n"
+            f"💰 Остаток: {user['balance']} монет\n\n"
+            f"⬅️ Нажми кнопку, чтобы продолжить",
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🛠 Продолжить покупки", callback_data="shop_drills")]
+            ]),
+            parse_mode=ParseMode.HTML
+        )
     else:
         await callback.answer("💎 Этот бур нельзя купить за монеты!", show_alert=True)
 
