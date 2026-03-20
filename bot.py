@@ -2244,12 +2244,62 @@ async def show_drill_list(callback: types.CallbackQuery, category: str):
 
 
 @dp.callback_query(F.data.startswith("view_drill_"))
-async def view_drill_test(callback: types.CallbackQuery):
-    """Тестовая функция для проверки"""
+async def view_drill(callback: types.CallbackQuery):
+    """Показывает фото бура с кнопкой покупки"""
     level = int(callback.data.split("_")[2])
+    user_id = callback.from_user.id
+    user = await get_user(user_id)
     drill = DRILL_LEVELS[level]
 
-    await callback.answer(f"Выбран бур: {drill['name']}", show_alert=True)
+    # Текст
+    text = f"✨ <b>{drill['name']}</b>\n\n"
+    text += f"🎁 Редкость: {drill['rarity']}\n"
+    text += f"⚡️ Бонус: +{drill['bonus']}%\n"
+    text += f"📝 {drill['desc']}\n\n"
+
+    if level > user['drill_level'] and drill.get('price_coins', 0) > 0:
+        text += f"💰 Цена: {drill['price_coins']} монет"
+    elif level <= user['drill_level']:
+        text += f"✅ Уже куплен"
+
+    # Кнопки
+    kb = []
+    if level > user['drill_level'] and drill.get('price_coins', 0) > 0:
+        kb.append([InlineKeyboardButton(text="💰 Купить", callback_data=f"buy_drill_{level}")])
+
+    # Определяем категорию для возврата
+    if level <= 2:
+        back_cat = "common"
+    elif level <= 4:
+        back_cat = "uncommon"
+    elif level <= 7:
+        back_cat = "rare"
+    elif level <= 12:
+        back_cat = "epic"
+    elif level <= 15:
+        back_cat = "legendary"
+    else:
+        back_cat = "mythic"
+
+    kb.append([InlineKeyboardButton(text="◀️ Назад", callback_data=f"back_to_category_{back_cat}")])
+
+    # Фото
+    image_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "images", f"drill_{level}.jpg")
+
+    if os.path.exists(image_path):
+        photo = FSInputFile(image_path)
+        await callback.message.delete()
+        await callback.message.answer_photo(
+            photo=photo,
+            caption=text,
+            reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
+            parse_mode=ParseMode.HTML
+        )
+    else:
+        await callback.message.edit_text(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb),
+                                         parse_mode=ParseMode.HTML)
+
+    await callback.answer()
 
 
 @dp.callback_query(F.data.startswith("view_drill_"))
