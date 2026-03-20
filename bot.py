@@ -3,6 +3,7 @@ import os
 import random
 import json
 import aiomysql
+import pytz
 from datetime import datetime, timedelta
 from typing import Optional, List
 from aiogram import Bot, Dispatcher, types, F
@@ -15,6 +16,20 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardMarkup, KeyboardButton, FSInputFile
 from aiogram.types import LabeledPrice, PreCheckoutQuery
 from aiogram.types.message import ContentType
+from datetime import datetime, timedelta, timezone
+MOSCOW_TZ = pytz.timezone('Europe/Moscow')
+
+# ==================== МОСКОВСКОЕ ВРЕМЯ ===============
+def now_moscow():
+    """Возвращает текущее время в Москве"""
+    return datetime.now(MOSCOW_TZ)
+
+def is_happy_hours() -> bool:
+    """Проверяет, активны ли сейчас счастливые часы в Москве"""
+    now = now_moscow().time()
+    start = datetime.strptime("12:00", "%H:%M").time()
+    end = datetime.strptime("14:00", "%H:%M").time()
+    return start <= now <= end
 
 # ================ ЗАЩИТА =======================
 import sys
@@ -648,11 +663,10 @@ def mine_resources(user):
     if user.get('boost_until') and datetime.now() < datetime.fromisoformat(user['boost_until']):
         multiplier *= user['boost_multiplier']
 
-    now = datetime.now().time()
-    start = datetime.strptime("12:00", "%H:%M").time()
-    end = datetime.strptime("14:00", "%H:%M").time()
-    if start <= now <= end:
+    # Счастливые часы по московскому времени
+    if is_happy_hours():
         multiplier *= 2
+        print("🎉 Счастливые часы активны! x2")
 
     total = int(5 * multiplier)
     inventory = json.loads(user['inventory'])
@@ -1984,6 +1998,7 @@ async def successful_payment(message: types.Message):
 
 # ===================== ПЛАНИРОВЩИК ТОПЛИВА =====================
 async def scheduled_fuel():
+    """Плановое восстановление топлива каждые 10 минут"""
     while True:
         await asyncio.sleep(FUEL_CONFIG["regen_interval"] * 60)
 
@@ -2009,17 +2024,8 @@ async def scheduled_fuel():
             except Exception as e:
                 print(f"Ошибка регена: {e}")
 
-        print(f"⛽ Реген: {regen_count} игроков, уведомлений: {full_notify}")
-
-
-@dp.message(F.text == "⛽ Статус топлива")
-async def fuel_status(message: types.Message):
-    user_id = message.from_user.id
-    user = await get_user(user_id)
-
-    if user['fuel'] >= user['max_fuel']:
-        await message.answer("⛽ У тебя **ПОЛНОЕ ТОПЛИВО**! Иди добывать! 💪")
-        return
+        now = now_moscow()
+        print(f"⛽ {now.strftime('%H:%M')} Реген: {regen_count} игроков, уведомлений: {full_notify}")
 
 # ========================== ТОП ====================
 @dp.message(F.text == "📊 Топ")
@@ -2259,38 +2265,12 @@ async def close_message(callback: types.CallbackQuery):
     await callback.message.delete()
     await callback.answer()
 
-async def happy_hours_start(self):
-    """Уведомление о начале счастливых часов"""
-    text = (
-        "🎁 <b>СЧАСТЛИВЫЕ ЧАСЫ НАЧАЛИСЬ!</b>\n\n"
-        "⏰ С 12:00 до 14:00 действует <b>УДВОЕННАЯ ДОБЫЧА</b>!\n"
-        "⛏ Каждая добыча приносит в 2 раза больше ресурсов!\n\n"
-        "🔥 Успей воспользоваться!"
-    )
-    users = await get_all_users()
-    await self.broadcast([u['user_id'] for u in users], text)
-
 def is_happy_hours() -> bool:
     """Проверяет, активны ли сейчас счастливые часы"""
     now = datetime.now().time()
     start = datetime.strptime("12:00", "%H:%M").time()
     end = datetime.strptime("14:00", "%H:%M").time()
     return start <= now <= end
-
-
-async def happy_hours_scheduler():
-    """Планировщик счастливых часов"""
-    while True:
-        now = datetime.now()
-
-        # Проверяем каждую минуту
-        if now.hour == 11 and now.minute == 55:  # За 5 минут до начала
-            await asyncio.sleep(5 * 60)  # Ждём до 12:00
-            if is_happy_hours() and hasattr(bot, 'notifier'):
-                await bot.notifier.happy_hours_start()
-
-        await asyncio.sleep(60)
-
 
 @dp.message(F.text == "🎁 Счастливые часы")
 async def happy_hours_info(message: types.Message):
@@ -2378,12 +2358,12 @@ async def happy_hours_scheduler():
 # ===================== ЗАПУСК =====================
 async def main():
     print("🚀 Бот запускается...")
+    print(f"🌍 Часовой пояс: {MOSCOW_TZ}")
     await init_db()
     await bot.delete_webhook(drop_pending_updates=True)
     asyncio.create_task(scheduled_fuel())
     asyncio.create_task(happy_hours_scheduler())
     await dp.start_polling(bot)
-
 
 if __name__ == "__main__":
     asyncio.run(main())
